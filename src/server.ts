@@ -6,8 +6,7 @@ import { NotFound } from "./Errors";
 import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import helmet from "helmet";
-import { startCronJobs } from "./jobs/cronJobs";
+import helmet from "helmet"; 
 import http from "http";
 import { Server } from "socket.io"; 
 import { setupSwagger } from "./config/swagger"; // 👈 1. استيراد دالة Swagger هنا
@@ -57,8 +56,7 @@ app.use((req, res, next) => {
 });
 
 app.use(errorHandler);
-
-startCronJobs();
+ 
 
 // 🚀 تشغيل الخادم على البورت 3000
 httpServer.listen(3000, () => {

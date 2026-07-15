@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const status_1 = require("../../controllers/admin/status");
+const catchAsync_1 = require("../../utils/catchAsync");
+const checkpermission_1 = require("../../middlewares/checkpermission");
+const router = (0, express_1.Router)();
+router.get("/", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(status_1.getAllVisitStatuss));
+router.get("/:id", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(status_1.getVisitStatussById));
+router.post("/", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(status_1.createVisitStatuss));
+router.put("/:id", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(status_1.updateVisitStatuss));
+router.delete("/:id", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(status_1.deleteVisitStatuss));
+exports.default = router;

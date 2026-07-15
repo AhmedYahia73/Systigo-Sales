@@ -1,10 +1,10 @@
 "use strict";
-// src/controllers/admin/adminController.ts
+// src/controllers/Leader/LeaderController.ts
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteAdmin = exports.updateAdmin = exports.createAdmin = exports.getAdminById = exports.getAllAdmin = exports.adminIdSchema = exports.updateAdminSchema = exports.createAdminSchema = void 0;
+exports.deleteLeader = exports.updateLeader = exports.createLeader = exports.getLeaderById = exports.lists = exports.getAllLeader = exports.leaderIdSchema = exports.updateLeaderSchema = exports.createLeaderSchema = void 0;
 const db_1 = require("../../models/db");
 const schema_1 = require("../../models/schema");
 const drizzle_orm_1 = require("drizzle-orm");
@@ -18,8 +18,8 @@ const zod_1 = require("zod");
 // ==========================================
 // 🛡️ Zod Validation Schemas
 // ==========================================
-// الـ Schema الخاص بإنشاء مسؤول (Admin) جديد
-exports.createAdminSchema = zod_1.z.object({
+// الـ Schema الخاص بإنشاء مستخدم Leader جديد
+exports.createLeaderSchema = zod_1.z.object({
     body: zod_1.z.object({
         name: zod_1.z.string({ required_error: "Name is required" })
             .min(1, "Name cannot be empty")
@@ -33,16 +33,17 @@ exports.createAdminSchema = zod_1.z.object({
         password: zod_1.z.string({ required_error: "Password is required" })
             .min(6, "Password must be at least 6 characters"),
         image: zod_1.z.string().nullable().optional(),
+        target_id: zod_1.z.string().uuid("Invalid target ID format").nullable().optional(),
         status: zod_1.z.enum(["active", "inactive"], {
             required_error: "Status is required",
             invalid_type_error: "Status must be either 'active' or 'inactive'",
         }),
     }),
 });
-// الـ Schema الخاص بتحديث مسؤول (Admin)
-exports.updateAdminSchema = zod_1.z.object({
+// الـ Schema الخاص بتحديث مستخدم Leader
+exports.updateLeaderSchema = zod_1.z.object({
     params: zod_1.z.object({
-        id: zod_1.z.string({ required_error: "ID is required" }).uuid("Invalid admin ID format"),
+        id: zod_1.z.string({ required_error: "ID is required" }).uuid("Invalid leader ID format"),
     }),
     body: zod_1.z.object({
         name: zod_1.z.string().min(1, "Name cannot be empty").max(200).optional(),
@@ -50,20 +51,21 @@ exports.updateAdminSchema = zod_1.z.object({
         phone: zod_1.z.string().min(5).max(20).optional(),
         password: zod_1.z.string().min(6, "Password must be at least 6 characters").optional(),
         image: zod_1.z.string().nullable().optional(),
+        target_id: zod_1.z.string().uuid("Invalid target ID format").nullable().optional(),
         status: zod_1.z.enum(["active", "inactive"]).optional(),
     }),
 });
 // الـ Schema للعمليات التي تتطلب المعرف ID فقط في الـ parameters
-exports.adminIdSchema = zod_1.z.object({
+exports.leaderIdSchema = zod_1.z.object({
     params: zod_1.z.object({
-        id: zod_1.z.string({ required_error: "ID is required" }).uuid("Invalid admin ID format"),
+        id: zod_1.z.string({ required_error: "ID is required" }).uuid("Invalid leader ID format"),
     }),
 });
 // ==========================================
 // 🎮 Controllers
 // ==========================================
-// ✅ Get All Admins
-const getAllAdmin = async (req, res) => {
+// ✅ Get All Leaders
+const getAllLeader = async (req, res) => {
     const allusers = await db_1.db
         .select({
         id: schema_1.users.id,
@@ -71,86 +73,102 @@ const getAllAdmin = async (req, res) => {
         email: schema_1.users.email,
         phone: schema_1.users.phone,
         image: schema_1.users.image,
+        target: schema_1.targets.name,
+        target_number: schema_1.targets.number,
         status: schema_1.users.status,
     })
         .from(schema_1.users)
-        .where((0, drizzle_orm_1.eq)(schema_1.users.role, "admin"));
-    (0, response_1.SuccessResponse)(res, { admins: allusers }, 200);
+        .leftJoin(schema_1.targets, (0, drizzle_orm_1.eq)(schema_1.users.target_id, schema_1.targets.id))
+        .where((0, drizzle_orm_1.eq)(schema_1.users.role, "leader"));
+    (0, response_1.SuccessResponse)(res, { leaders: allusers }, 200);
 };
-exports.getAllAdmin = getAllAdmin;
-// ✅ Get Admin By ID
-const getAdminById = async (req, res) => {
-    const validated = await exports.adminIdSchema.parseAsync({ params: req.params });
+exports.getAllLeader = getAllLeader;
+// ✅ Get Targets List (لإستخدامها في القائمة المنسدلة)
+const lists = async (req, res) => {
+    const target_list = await db_1.db
+        .select({
+        id: schema_1.targets.id,
+        name: schema_1.targets.name,
+    })
+        .from(schema_1.targets);
+    (0, response_1.SuccessResponse)(res, { target_list }, 200);
+};
+exports.lists = lists;
+// ✅ Get Leader By ID
+const getLeaderById = async (req, res) => {
+    const validated = await exports.leaderIdSchema.parseAsync({ params: req.params });
     const { id } = validated.params;
-    const admin = await db_1.db
+    const leader = await db_1.db
         .select({
         id: schema_1.users.id,
         name: schema_1.users.name,
         email: schema_1.users.email,
         phone: schema_1.users.phone,
         image: schema_1.users.image,
+        target_id: schema_1.users.target_id,
         status: schema_1.users.status,
     })
         .from(schema_1.users)
-        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.id, id), (0, drizzle_orm_1.eq)(schema_1.users.role, "admin")))
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.id, id), (0, drizzle_orm_1.eq)(schema_1.users.role, "leader")))
         .limit(1);
-    if (!admin[0]) {
-        throw new NotFound_1.NotFound("Admin not found");
+    if (!leader[0]) {
+        throw new NotFound_1.NotFound("Leader not found");
     }
-    (0, response_1.SuccessResponse)(res, { admin: admin[0] }, 200);
+    (0, response_1.SuccessResponse)(res, { leader: leader[0] }, 200);
 };
-exports.getAdminById = getAdminById;
-// ✅ Create Admin
-const createAdmin = async (req, res) => {
-    const validated = await exports.createAdminSchema.parseAsync({ body: req.body });
-    const { name, email, password, phone, image, status } = validated.body;
+exports.getLeaderById = getLeaderById;
+// ✅ Create Leader
+const createLeader = async (req, res) => {
+    const validated = await exports.createLeaderSchema.parseAsync({ body: req.body });
+    const { name, email, password, phone, image, target_id, status } = validated.body;
     // تحقق من عدم وجود مستخدم آخر بنفس الـ email أو الـ phone
-    const existingAdmin = await db_1.db
+    const existingLeader = await db_1.db
         .select()
         .from(schema_1.users)
         .where((0, drizzle_orm_1.or)((0, drizzle_orm_1.eq)(schema_1.users.email, email), (0, drizzle_orm_1.eq)(schema_1.users.phone, phone)))
         .limit(1);
-    if (existingAdmin[0]) {
+    if (existingLeader[0]) {
         throw new BadRequest_1.BadRequest("Email or Phone already exists");
     }
-    // Hash الـ password
+    // تشفير كلمة المرور
     const hashedPassword = await bcrypt_1.default.hash(password, 10);
-    let savedAdminImage = null;
+    let savedLeaderImage = null;
     if (image) {
-        const result = await (0, handleImages_1.saveBase64Image)(req, image, "admins");
-        savedAdminImage = result.url;
+        const result = await (0, handleImages_1.saveBase64Image)(req, image, "leaders");
+        savedLeaderImage = result.url;
     }
     await db_1.db.insert(schema_1.users).values({
         name,
         email,
         phone,
-        image: savedAdminImage,
+        image: savedLeaderImage,
         password: hashedPassword,
-        role: "admin",
+        role: "leader",
+        target_id: target_id || null, // ربط القائد بالـ target إن وجد
         status: status,
     });
-    (0, response_1.SuccessResponse)(res, { message: "Admin created successfully" }, 201);
+    (0, response_1.SuccessResponse)(res, { message: "Leader created successfully" }, 201);
 };
-exports.createAdmin = createAdmin;
-// ✅ Update Admin
-const updateAdmin = async (req, res) => {
-    const validated = await exports.updateAdminSchema.parseAsync({
+exports.createLeader = createLeader;
+// ✅ Update Leader
+const updateLeader = async (req, res) => {
+    const validated = await exports.updateLeaderSchema.parseAsync({
         params: req.params,
         body: req.body
     });
     const { id } = validated.params;
-    const { name, email, password, phone, image, status } = validated.body;
-    // تحقق من وجود الـ Admin
-    const existingAdmin = await db_1.db
+    const { name, email, password, phone, image, target_id, status } = validated.body;
+    // تحقق من وجود الـ Leader
+    const existingLeader = await db_1.db
         .select()
         .from(schema_1.users)
-        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.id, id), (0, drizzle_orm_1.eq)(schema_1.users.role, "admin")))
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.id, id), (0, drizzle_orm_1.eq)(schema_1.users.role, "leader")))
         .limit(1);
-    if (!existingAdmin[0]) {
-        throw new NotFound_1.NotFound("Admin not found");
+    if (!existingLeader[0]) {
+        throw new NotFound_1.NotFound("Leader not found");
     }
     // تحقق من الـ email لو تم تعديله ولم يكرر مع حساب آخر
-    if (email && email !== existingAdmin[0].email) {
+    if (email && email !== existingLeader[0].email) {
         const duplicateEmail = await db_1.db
             .select()
             .from(schema_1.users)
@@ -161,7 +179,7 @@ const updateAdmin = async (req, res) => {
         }
     }
     // تحقق من الـ phone لو تم تعديله ولم يكرر مع حساب آخر
-    if (phone && phone !== existingAdmin[0].phone) {
+    if (phone && phone !== existingLeader[0].phone) {
         const duplicatePhone = await db_1.db
             .select()
             .from(schema_1.users)
@@ -171,25 +189,25 @@ const updateAdmin = async (req, res) => {
             throw new BadRequest_1.BadRequest("Phone already exists");
         }
     }
-    let adminImage = existingAdmin[0].image;
+    let leaderImage = existingLeader[0].image;
     if (image !== undefined) {
         if (image) {
-            const result = await (0, handleImages_1.saveBase64Image)(req, image, "admins");
-            // حذف الصورة القديمة من السيرفر بعد رفع الجديدة بنجاح
-            if (existingAdmin[0].image) {
-                await (0, deleteImage_1.deletePhotoFromServer)(existingAdmin[0].image);
+            const result = await (0, handleImages_1.saveBase64Image)(req, image, "leaders");
+            // حذف الصورة القديمة من السيرفر بعد رفع الصورة الجديدة بنجاح
+            if (existingLeader[0].image) {
+                await (0, deleteImage_1.deletePhotoFromServer)(existingLeader[0].image);
             }
-            adminImage = result.url;
+            leaderImage = result.url;
         }
         else {
-            // حذف الصورة القديمة وتصفير الحقل إذا تم إرسال قيمة فارغة
-            if (existingAdmin[0].image) {
-                await (0, deleteImage_1.deletePhotoFromServer)(existingAdmin[0].image);
+            // تصفير الصورة وحذفها من السيرفر إذا أرسل قيمة فارغة
+            if (existingLeader[0].image) {
+                await (0, deleteImage_1.deletePhotoFromServer)(existingLeader[0].image);
             }
-            adminImage = null;
+            leaderImage = null;
         }
     }
-    // بناء كائن التحديث بشكل يحافظ على البيانات الحالية في حال عدم إرسالها
+    // بناء كائن البيانات المحدثة مع تلافي القيم الـ undefined
     const updateData = {};
     if (name !== undefined)
         updateData.name = name;
@@ -197,35 +215,37 @@ const updateAdmin = async (req, res) => {
         updateData.email = email;
     if (phone !== undefined)
         updateData.phone = phone;
+    if (leaderImage !== undefined)
+        updateData.image = leaderImage;
     if (status !== undefined)
         updateData.status = status;
-    if (adminImage !== undefined)
-        updateData.image = adminImage;
-    // لو فيه password جديد
+    if (target_id !== undefined)
+        updateData.target_id = target_id;
+    // لو تم إرسال password جديد
     if (password) {
         updateData.password = await bcrypt_1.default.hash(password, 10);
     }
     await db_1.db.update(schema_1.users).set(updateData).where((0, drizzle_orm_1.eq)(schema_1.users.id, id));
-    (0, response_1.SuccessResponse)(res, { message: "Admin updated successfully" }, 200);
+    (0, response_1.SuccessResponse)(res, { message: "Leader updated successfully" }, 200);
 };
-exports.updateAdmin = updateAdmin;
-// ✅ Delete Admin
-const deleteAdmin = async (req, res) => {
-    const validated = await exports.adminIdSchema.parseAsync({ params: req.params });
+exports.updateLeader = updateLeader;
+// ✅ Delete Leader
+const deleteLeader = async (req, res) => {
+    const validated = await exports.leaderIdSchema.parseAsync({ params: req.params });
     const { id } = validated.params;
-    const existingAdmin = await db_1.db
+    const existingLeader = await db_1.db
         .select()
         .from(schema_1.users)
-        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.id, id), (0, drizzle_orm_1.eq)(schema_1.users.role, "admin")))
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.id, id), (0, drizzle_orm_1.eq)(schema_1.users.role, "leader")))
         .limit(1);
-    if (!existingAdmin[0]) {
-        throw new NotFound_1.NotFound("Admin not found");
+    if (!existingLeader[0]) {
+        throw new NotFound_1.NotFound("Leader not found");
     }
-    // حذف الصورة من السيرفر قبل مسح الحساب
-    if (existingAdmin[0].image) {
-        await (0, deleteImage_1.deletePhotoFromServer)(existingAdmin[0].image);
+    // حذف صورة الـ Leader من السيرفر أولاً
+    if (existingLeader[0].image) {
+        await (0, deleteImage_1.deletePhotoFromServer)(existingLeader[0].image);
     }
     await db_1.db.delete(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.id, id));
-    (0, response_1.SuccessResponse)(res, { message: "Admin deleted successfully" }, 200);
+    (0, response_1.SuccessResponse)(res, { message: "Leader deleted successfully" }, 200);
 };
-exports.deleteAdmin = deleteAdmin;
+exports.deleteLeader = deleteLeader;
