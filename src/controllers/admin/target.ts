@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound";
 import { z } from "zod";
+import { float } from "drizzle-orm/mysql-core";
 
 // ==========================================
 // 🛡️ Zod Validation Schemas
@@ -123,7 +124,7 @@ export const createTargets = async (req: Request, res: Response) => {
     await db.insert(targets).values({
         type,
         name,
-        number: String(number), // لو حقل الداتابيز double كـ string أو اتركها number حسب الـ schema عندك
+        number: number, // لو حقل الداتابيز double كـ string أو اتركها number حسب الـ schema عندك
     });
 
     SuccessResponse(res, { message: "Targets created successfully" }, 201);
@@ -150,12 +151,13 @@ export const updateTargets = async (req: Request, res: Response) => {
     }
 
     // بناء كائن التحديث ديناميكياً لتجنب إرسال قيم undefined
-    const updateData: Partial<{ type: "visit" | "sales"; name: string; number: string }> = {};
+    const updateData: Partial<{ type: "visit" | "sales"; name: string; number: number }> = {};
     if (type !== undefined) updateData.type = type;
     if (name !== undefined) updateData.name = name;
-    if (number !== undefined) updateData.number = String(number);
-
-    await db.update(targets).set(updateData).where(eq(targets.id, id));
+    if (number !== undefined) updateData.number = Number(number);
+    if(updateData){
+        await db.update(targets).set(updateData).where(eq(targets.id, id));
+    }
 
     SuccessResponse(res, { message: "Targets updated successfully" }, 200);
 };

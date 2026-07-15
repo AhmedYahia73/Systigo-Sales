@@ -1,4 +1,4 @@
-// src/models/schema/busType.ts
+// src/models/schema/users.ts
 
 import {
   mysqlTable,
@@ -9,7 +9,7 @@ import {
   char,
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
-import { targets } from "./targets";
+import { targets } from "./targets"; 
 export const users = mysqlTable("users", {
   id: char("id", { length: 36 }).primaryKey().default(sql`(UUID())`), 
 

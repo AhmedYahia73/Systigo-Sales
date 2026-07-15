@@ -1,4 +1,4 @@
-// src/models/schema/superAdminRole.ts
+// src/models/schema/targets.ts
 
 import {
   mysqlTable,

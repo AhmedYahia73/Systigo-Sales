@@ -9,8 +9,7 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { startCronJobs } from "./jobs/cronJobs";
 import http from "http";
-import { Server } from "socket.io";
-import { initSocket } from "./socket";
+import { Server } from "socket.io"; 
 import { setupSwagger } from "./config/swagger"; // 👈 1. استيراد دالة Swagger هنا
 
 dotenv.config();
@@ -24,8 +23,6 @@ const io = new Server(httpServer, {
     methods: ["GET", "POST"]
   }
 });
-
-initSocket(io);
 
 // ✅ CORS بدون app.options
 app.use(cors({

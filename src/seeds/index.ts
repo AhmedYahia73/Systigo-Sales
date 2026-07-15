@@ -2,27 +2,19 @@ import { Seed } from "./runner";
 
 // Auto-discover and register all seed files
 // Import all seed files in order
-import superAdminRoles from "./data/01_super_admin_roles";
-import superAdmins from "./data/02_super_admins";
-import organizationTypes from "./data/03_organization_types";
-import plans from "./data/04_plans";
-import busTypes from "./data/05_bus_types";
-import paymentMethods from "./data/06_payment_methods";
-import adminRoles from "./data/07_admin_roles";
-// import cities from "./data/08_cities";
-import promocodes from "./data/09_promocodes";
+import adminSeeder from "./data/01_admin";
+import targetsSeeder from "./data/02_default_targets";
+import visitsSeeder from "./data/03_default_visits";
+import statusSeeder from "./data/04_default_visit_status";
+import wishListSeeder from "./data/05_default_wishlist";
 
 // Export all seeds in execution order
-export const seeds: Seed[] = [
-  superAdminRoles,
-  superAdmins,
-  organizationTypes,
-  plans,
-  busTypes,
-  paymentMethods,
-  adminRoles,
-//cities,
-  promocodes,
+export const seeds: Seed[] = [ 
+  visitsSeeder,
+  targetsSeeder,
+  statusSeeder,
+  wishListSeeder,
+  adminSeeder, 
 ];
 
 // Run seeds when this file is executed directly

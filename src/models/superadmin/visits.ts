@@ -1,4 +1,4 @@
-// src/models/schema/superAdmin.ts
+// src/models/schema/visits.ts
 
 import {
   mysqlTable,
@@ -20,7 +20,7 @@ export const visits = mysqlTable("visits", {
   notes: varchar("notes", { length: 1000 }),
   phone: varchar("phone", { length: 20 }).notNull(),
  
-  status: mysqlEnum("status", ["visit", "sales", "delivered"]).default("active"),
+  status: mysqlEnum("status", ["visit", "sales", "delivered"]).default("visit"),
   status_id: char("status_id", { length: 36 }).references(() => visitStatus.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),

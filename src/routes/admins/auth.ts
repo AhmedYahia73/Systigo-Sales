@@ -2,7 +2,7 @@ import { Router } from "express";
 import { login } from "../../controllers/auth/auth";
 import { catchAsync } from "../../utils/catchAsync";
 import { validate } from "../../middlewares/validation";
-import { loginSchema } from "../../validators/admin/auth";
+import { loginSchema } from "../../validators/auth";
 
 const route = Router();
 

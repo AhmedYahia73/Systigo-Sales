@@ -34,50 +34,18 @@ export async function login(req: Request, res: Response) {
   // 3) التحقق من حالة الحساب
   if (admin[0].status !== "active") {
     throw new UnauthorizedError("Your account is inactive");
-  }
-
-  // 4) جلب الـ Role والـ Permissions
-  let role = null;
-  let permissions: Permission[] = [];
-
-  if (admin[0].type === "organizer") {
-    // الـ Organizer له كل الصلاحيات
-    permissions = [];
-  } else if (admin[0].roleId) {
-    const roleData = await db
-      .select()
-      .from(roles)
-      .where(eq(roles.id, admin[0].roleId))
-      .limit(1);
-
-    if (roleData[0]) {
-      role = {
-        id: roleData[0].id,
-        name: roleData[0].name,
-      };
-      permissions = parsePermissions(roleData[0].permissions);
-    }
-  }
-
-  // دمج صلاحيات الـ Admin الإضافية
-  const adminPermissions = parsePermissions(admin[0].permissions);
-  if (adminPermissions.length > 0) {
-    permissions = mergePermissions(permissions, adminPermissions);
-  }
+  } 
 
   // 5) إنشاء التوكن
   const tokenPayload = {
     id: admin[0].id,
-    type: admin[0].type,
+    role: admin[0].role,
     email: admin[0].email,
     name: admin[0].name,
-    organizationId: admin[0].organizationId,
+    phone: admin[0].phone,
   };
 
-  const token =
-    admin[0].type === "organizer"
-      ? generateOrganizerToken(tokenPayload)
-      : generateAdminToken(tokenPayload);
+  const token = generateUserToken(tokenPayload);
 
   // 6) الرد
   return SuccessResponse(
@@ -90,11 +58,7 @@ export async function login(req: Request, res: Response) {
         name: admin[0].name,
         email: admin[0].email,
         phone: admin[0].phone,
-        avatar: admin[0].avatar,
-        type: admin[0].type,
-        organizationId: admin[0].organizationId,
-        role,
-        permissions,
+        role: admin[0].role, 
       },
     },
     200

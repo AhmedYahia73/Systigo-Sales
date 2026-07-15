@@ -1,8 +1,6 @@
+
 import { boolean, date, int, mysqlTable, timestamp, varchar, char } from "drizzle-orm/mysql-core";
-import { plans } from "./plan";
-import { organizations } from "./organization";
-import { sql } from "drizzle-orm";
-import { payment } from "./payment";
+import { sql } from "drizzle-orm"; 
 import { mysqlEnum } from "drizzle-orm/mysql-core";
 
 export const wishList = mysqlTable("wishList", {
