@@ -11,7 +11,7 @@ async function createDatabase() {
         user: process.env.DB_USER,
         password: process.env.DB_PASSWORD || "",
     });
-    const dbName = process.env.DB_NAME || "bus";
+    const dbName = process.env.DB_NAME || "systigo";
     await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
     console.log(`Database "${dbName}" created successfully!`);
     await connection.end();

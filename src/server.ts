@@ -15,6 +15,7 @@ dotenv.config();
 
 const app = express();
 
+
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
   cors: {
@@ -43,7 +44,7 @@ app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // 📝 2. تفعيل واجهة Swagger (يُفضل وضعها قبل الـ Routes الأساسية للمشروع)
-setupSwagger(app);
+// setupSwagger(app);
 
 app.get("/api/test", (req, res, next) => {
   res.json({ message: "API is working! notify token" });
