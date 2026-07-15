@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const busTypes_1 = require("../../controllers/superadmin/busTypes");
+const validation_1 = require("../../middlewares/validation");
+const busTypes_2 = require("../../validators/superadmin/busTypes");
+const catchAsync_1 = require("../../utils/catchAsync");
+const route = (0, express_1.Router)();
+route.get("/", (0, catchAsync_1.catchAsync)(busTypes_1.getAllBusTypes));
+route.post("/", (0, validation_1.validate)(busTypes_2.createBusTypeSchema), (0, catchAsync_1.catchAsync)(busTypes_1.createBusType));
+route.get("/:Id", (0, catchAsync_1.catchAsync)(busTypes_1.getBusTypeById));
+route.put("/:Id", (0, validation_1.validate)(busTypes_2.updateBusTypeSchema), (0, catchAsync_1.catchAsync)(busTypes_1.updateBusType));
+route.delete("/:Id", (0, catchAsync_1.catchAsync)(busTypes_1.deleteBusType));
+exports.default = route;
