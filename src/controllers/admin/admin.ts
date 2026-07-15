@@ -10,8 +10,67 @@ import { BadRequest } from "../../Errors/BadRequest";
 import bcrypt from "bcrypt";
 import { saveBase64Image } from "../../utils/handleImages";
 import { deletePhotoFromServer } from "../../utils/deleteImage";
+import { z } from "zod";
 
-// ✅ Get All Admins (للـ Organization الحالية)
+// ==========================================
+// 🛡️ Zod Validation Schemas
+// ==========================================
+
+// الـ Schema الخاص بإنشاء مسؤول (Admin) جديد
+export const createAdminSchema = z.object({
+  body: z.object({
+    name: z.string({ required_error: "Name is required" })
+      .min(1, "Name cannot be empty")
+      .max(200, "Name cannot exceed 200 characters"),
+    
+    email: z.string({ required_error: "Email is required" })
+      .email("Invalid email format")
+      .max(100, "Email cannot exceed 100 characters"),
+    
+    phone: z.string({ required_error: "Phone is required" })
+      .min(5, "Phone is too short")
+      .max(20, "Phone cannot exceed 20 characters"),
+    
+    password: z.string({ required_error: "Password is required" })
+      .min(6, "Password must be at least 6 characters"),
+    
+    image: z.string().nullable().optional(),
+
+    status: z.enum(["active", "inactive"], {
+      required_error: "Status is required",
+      invalid_type_error: "Status must be either 'active' or 'inactive'",
+    }),
+  }),
+});
+
+// الـ Schema الخاص بتحديث مسؤول (Admin)
+export const updateAdminSchema = z.object({
+  params: z.object({
+    id: z.string({ required_error: "ID is required" }).uuid("Invalid admin ID format"),
+  }),
+  body: z.object({
+    name: z.string().min(1, "Name cannot be empty").max(200).optional(),
+    email: z.string().email("Invalid email format").max(100).optional(),
+    phone: z.string().min(5).max(20).optional(),
+    password: z.string().min(6, "Password must be at least 6 characters").optional(),
+    image: z.string().nullable().optional(),
+    status: z.enum(["active", "inactive"]).optional(),
+  }),
+});
+
+// الـ Schema للعمليات التي تتطلب المعرف ID فقط في الـ parameters
+export const adminIdSchema = z.object({
+  params: z.object({
+    id: z.string({ required_error: "ID is required" }).uuid("Invalid admin ID format"),
+  }),
+});
+
+
+// ==========================================
+// 🎮 Controllers
+// ==========================================
+
+// ✅ Get All Admins
 export const getAllAdmin = async (req: Request, res: Response) => {
     const allusers = await db
         .select({
@@ -20,6 +79,7 @@ export const getAllAdmin = async (req: Request, res: Response) => {
             email: users.email,
             phone: users.phone,
             image: users.image,
+            status: users.status, 
         })
         .from(users)
         .where(eq(users.role, "admin"));
@@ -29,7 +89,8 @@ export const getAllAdmin = async (req: Request, res: Response) => {
 
 // ✅ Get Admin By ID
 export const getAdminById = async (req: Request, res: Response) => {
-    const { id } = req.params; 
+    const validated = await adminIdSchema.parseAsync({ params: req.params });
+    const { id } = validated.params; 
 
     const admin = await db
         .select({
@@ -38,9 +99,10 @@ export const getAdminById = async (req: Request, res: Response) => {
             email: users.email,
             phone: users.phone,
             image: users.image,
+            status: users.status, 
         })
         .from(users) 
-        .where(eq(users.id, id))
+        .where(and(eq(users.id, id), eq(users.role, "admin")))
         .limit(1);
 
     if (!admin[0]) {
@@ -52,9 +114,10 @@ export const getAdminById = async (req: Request, res: Response) => {
 
 // ✅ Create Admin
 export const createAdmin = async (req: Request, res: Response) => {
-    const { name, email, password, phone, image } = req.body;
+    const validated = await createAdminSchema.parseAsync({ body: req.body });
+    const { name, email, password, phone, image, status } = validated.body;
     
-    // تحقق من عدم وجود admin بنفس الـ email أو الـ phone
+    // تحقق من عدم وجود مستخدم آخر بنفس الـ email أو الـ phone
     const existingAdmin = await db
         .select()
         .from(users)
@@ -82,6 +145,7 @@ export const createAdmin = async (req: Request, res: Response) => {
         image: savedAdminImage,
         password: hashedPassword,
         role: "admin",
+        status: status, 
     });
 
     SuccessResponse(res, { message: "Admin created successfully" }, 201);
@@ -89,21 +153,25 @@ export const createAdmin = async (req: Request, res: Response) => {
 
 // ✅ Update Admin
 export const updateAdmin = async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const { name, email, password, phone, image } = req.body;
+    const validated = await updateAdminSchema.parseAsync({ 
+        params: req.params, 
+        body: req.body 
+    });
+    const { id } = validated.params;
+    const { name, email, password, phone, image, status } = validated.body;
   
     // تحقق من وجود الـ Admin
     const existingAdmin = await db
         .select()
         .from(users)
-        .where(eq(users.id, id))
+        .where(and(eq(users.id, id), eq(users.role, "admin")))
         .limit(1);
 
     if (!existingAdmin[0]) {
         throw new NotFound("Admin not found");
     }
 
-    // لو بيغير الـ email، نتحقق إنه مش موجود لمستخدم آخر
+    // تحقق من الـ email لو تم تعديله ولم يكرر مع حساب آخر
     if (email && email !== existingAdmin[0].email) {
         const duplicateEmail = await db
             .select()
@@ -115,6 +183,19 @@ export const updateAdmin = async (req: Request, res: Response) => {
             throw new BadRequest("Email already exists");
         }
     } 
+
+    // تحقق من الـ phone لو تم تعديله ولم يكرر مع حساب آخر
+    if (phone && phone !== existingAdmin[0].phone) {
+        const duplicatePhone = await db
+            .select()
+            .from(users)
+            .where(and(eq(users.phone, phone), ne(users.id, id)))
+            .limit(1);
+
+        if (duplicatePhone[0]) {
+            throw new BadRequest("Phone already exists");
+        }
+    }
 
     let adminImage = existingAdmin[0].image;
 
@@ -135,12 +216,13 @@ export const updateAdmin = async (req: Request, res: Response) => {
         }
     }
 
-    const updateData: any = {
-        name: name ?? existingAdmin[0].name,
-        email: email ?? existingAdmin[0].email,
-        phone: phone !== undefined ? phone : existingAdmin[0].phone,
-        image: adminImage, 
-    };
+    // بناء كائن التحديث بشكل يحافظ على البيانات الحالية في حال عدم إرسالها
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email;
+    if (phone !== undefined) updateData.phone = phone;
+    if (status !== undefined) updateData.status = status;
+    if (adminImage !== undefined) updateData.image = adminImage;
 
     // لو فيه password جديد
     if (password) {
@@ -154,12 +236,13 @@ export const updateAdmin = async (req: Request, res: Response) => {
 
 // ✅ Delete Admin
 export const deleteAdmin = async (req: Request, res: Response) => {
-    const { id } = req.params; 
+    const validated = await adminIdSchema.parseAsync({ params: req.params });
+    const { id } = validated.params; 
  
     const existingAdmin = await db
         .select()
         .from(users)
-        .where(eq(users.id, id))
+        .where(and(eq(users.id, id), eq(users.role, "admin")))
         .limit(1);
 
     if (!existingAdmin[0]) {

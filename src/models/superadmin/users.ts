@@ -18,6 +18,7 @@ export const users = mysqlTable("users", {
   phone: varchar("phone", { length: 20 }).notNull().unique(),
   image: varchar("image", { length: 200 }),
   password: varchar("password", { length: 255 }).notNull(),
+  status: mysqlEnum("status", ["active", "inactive"]).default("active"),
   role: mysqlEnum("role", ["admin", "leader", "sales"]).notNull().default("sales"),
   leader_id: char("leader_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
   target_id: char("target_id", { length: 36 }).references(() => targets.id, { onDelete: "set null" }),

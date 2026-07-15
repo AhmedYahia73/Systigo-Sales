@@ -20,7 +20,7 @@ import { sql } from "drizzle-orm";
 export const targets = mysqlTable("targets", {
   id: char("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
   type: mysqlEnum("type", ["visit", "sales"]).default("visit"),
-  name: varchar("name", { length: 255 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
   number: double("number").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),

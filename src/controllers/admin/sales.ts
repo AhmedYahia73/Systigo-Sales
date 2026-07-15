@@ -10,10 +10,82 @@ import { BadRequest } from "../../Errors/BadRequest";
 import bcrypt from "bcrypt";
 import { saveBase64Image } from "../../utils/handleImages";
 import { deletePhotoFromServer } from "../../utils/deleteImage";
+import { z } from "zod";
+
+// ==========================================
+// 🛡️ Zod Validation Schemas
+// ==========================================
+
+// الـ Schema الخاص بإنشاء مستخدم Sales جديد
+export const createSalesSchema = z.object({
+  body: z.object({
+    name: z.string({ required_error: "Name is required" })
+      .min(1, "Name cannot be empty")
+      .max(200, "Name cannot exceed 200 characters"),
+    
+    email: z.string({ required_error: "Email is required" })
+      .email("Invalid email format")
+      .max(100, "Email cannot exceed 100 characters"),
+    
+    phone: z.string({ required_error: "Phone is required" })
+      .min(5, "Phone is too short")
+      .max(20, "Phone cannot exceed 20 characters"),
+    
+    password: z.string({ required_error: "Password is required" })
+      .min(6, "Password must be at least 6 characters"),
+    
+    image: z.string().nullable().optional(),
+    
+    leader_id: z.string({ required_error: "Leader ID is required" })
+      .uuid("Invalid leader ID format"),
+    
+    target_id: z.string().uuid("Invalid target ID format").nullable().optional(),
+
+    status: z.enum(["active", "inactive"], {
+      required_error: "Status is required",
+      invalid_type_error: "Status must be either 'active' or 'inactive'",
+    }),
+  }),
+});
+
+// الـ Schema الخاص بتحديث مستخدم Sales
+export const updateSalesSchema = z.object({
+  params: z.object({
+    id: z.string({ required_error: "ID is required" }).uuid("Invalid sales ID format"),
+  }),
+  body: z.object({
+    name: z.string().min(1, "Name cannot be empty").max(200).optional(),
+    email: z.string().email("Invalid email format").max(100).optional(),
+    phone: z.string().min(5).max(20).optional(),
+    password: z.string().min(6, "Password must be at least 6 characters").optional(),
+    image: z.string().nullable().optional(),
+    leader_id: z.string().uuid("Invalid leader ID format").optional(), 
+    target_id: z.string().uuid("Invalid target ID format").nullable().optional(),
+    status: z.enum(["active", "inactive"]).optional(),
+  }),
+});
+
+// الـ Schema للعمليات التي تتطلب المعرف ID فقط
+export const salesIdSchema = z.object({
+  params: z.object({
+    id: z.string({ required_error: "ID is required" }).uuid("Invalid sales ID format"),
+  }),
+});
+
+
+// ==========================================
+// 🎮 Controllers
+// ==========================================
 
 // ✅ Get All Sales (للـ Organization الحالية مع الـ Targets الخاصة بهم)
 export const getAllSales = async (req: Request, res: Response) => {
+    // جلب قائد الفريق الآخر بربط ذاتي (Self Join) لعرض بيانات الـ Leader
+    const leaderAlias = db.$with("leaderAlias").as(
+        db.select().from(users)
+    );
+
     const allusers = await db
+        .with(leaderAlias)
         .select({
             id: users.id,
             name: users.name,
@@ -22,12 +94,13 @@ export const getAllSales = async (req: Request, res: Response) => {
             image: users.image,
             target: targets.name,
             target_number: targets.number,
-            leader_name: users.name,
-            leader_phone: users.phone,
+            leader_name: leaderAlias.name,
+            leader_phone: leaderAlias.phone,
+            status: users.status, 
         })
         .from(users)
         .leftJoin(targets, eq(users.target_id, targets.id))
-        .leftJoin(users, eq(users.leader_id, users.id))
+        .leftJoin(leaderAlias, eq(users.leader_id, leaderAlias.id))
         .where(eq(users.role, "sales"));
 
     SuccessResponse(res, { sales: allusers }, 200);
@@ -41,21 +114,22 @@ export const lists = async (req: Request, res: Response) => {
             name: targets.name, 
         })
         .from(targets); 
+
     const leaders = await db
-    .select({
-        id: users.id,
-        name: users.name, 
-    })
-    .from(users)
-    .where(eq(users.role, "leader"))
+        .select({
+            id: users.id,
+            name: users.name, 
+        })
+        .from(users)
+        .where(eq(users.role, "leader"));
 
-
-    SuccessResponse(res, { target_list: target_list, leaders }, 200);
+    SuccessResponse(res, { target_list, leaders }, 200);
 };
 
 // ✅ Get Sales By ID
 export const getSalesById = async (req: Request, res: Response) => {
-    const { id } = req.params; 
+    const validated = await salesIdSchema.parseAsync({ params: req.params });
+    const { id } = validated.params; 
 
     const sales = await db
         .select({
@@ -66,9 +140,10 @@ export const getSalesById = async (req: Request, res: Response) => {
             image: users.image,
             target_id: users.target_id,
             leader_id: users.leader_id,
+            status: users.status, 
         })
         .from(users) 
-        .where(eq(users.id, id))
+        .where(and(eq(users.id, id), eq(users.role, "sales")))
         .limit(1);
 
     if (!sales[0]) {
@@ -80,9 +155,21 @@ export const getSalesById = async (req: Request, res: Response) => {
 
 // ✅ Create Sales
 export const createSales = async (req: Request, res: Response) => {
-    const { name, email, password, phone, image, target_id, leader_id } = req.body;
+    const validated = await createSalesSchema.parseAsync({ body: req.body });
+    const { name, email, password, phone, image, target_id, leader_id, status } = validated.body;
     
-    // تحقق من عدم وجود Sales بنفس الـ email أو الـ phone
+    // 1. تحقق من وجود الـ Leader وصحة الـ Role الخاص به
+    const targetLeader = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.id, leader_id), eq(users.role, "leader")))
+        .limit(1);
+
+    if (!targetLeader[0]) {
+        throw new BadRequest("The assigned leader was not found or is invalid");
+    }
+
+    // 2. تحقق من عدم تكرار البريد الإلكتروني أو الهاتف لحساب آخر
     const existingSales = await db
         .select()
         .from(users)
@@ -107,11 +194,12 @@ export const createSales = async (req: Request, res: Response) => {
         name,
         email,
         phone,
-        leader_id,
+        leader_id, 
         image: savedSalesImage,
         password: hashedPassword,
         role: "sales",
-        target_id: target_id || null, // حفظ الـ Target للموظف إن وجد
+        target_id: target_id || null, 
+        status: status, 
     });
 
     SuccessResponse(res, { message: "Sales created successfully" }, 201);
@@ -119,21 +207,38 @@ export const createSales = async (req: Request, res: Response) => {
 
 // ✅ Update Sales
 export const updateSales = async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const { name, email, password, phone, image, target_id, leader_id } = req.body;
+    const validated = await updateSalesSchema.parseAsync({ 
+        params: req.params, 
+        body: req.body 
+    });
+    const { id } = validated.params;
+    const { name, email, password, phone, image, target_id, leader_id, status } = validated.body;
   
-    // تحقق من وجود الـ Sales
+    // 1. تحقق من وجود الـ Sales نفسه وصحة الـ Role
     const existingSales = await db
         .select()
         .from(users)
-        .where(eq(users.id, id))
+        .where(and(eq(users.id, id), eq(users.role, "sales")))
         .limit(1);
 
     if (!existingSales[0]) {
         throw new NotFound("Sales not found");
     }
 
-    // تحقق من الـ email لو كان تم تعديله
+    // 2. تحقق من صحة الـ Leader الجديد إذا تم إرساله
+    if (leader_id) {
+        const targetLeader = await db
+            .select()
+            .from(users)
+            .where(and(eq(users.id, leader_id), eq(users.role, "leader")))
+            .limit(1);
+
+        if (!targetLeader[0]) {
+            throw new BadRequest("The assigned leader was not found or is invalid");
+        }
+    }
+
+    // 3. تحقق من البريد الإلكتروني المكرر
     if (email && email !== existingSales[0].email) {
         const duplicateEmail = await db
             .select()
@@ -146,18 +251,29 @@ export const updateSales = async (req: Request, res: Response) => {
         }
     } 
 
+    // 4. تحقق من الهاتف المكرر
+    if (phone && phone !== existingSales[0].phone) {
+        const duplicatePhone = await db
+            .select()
+            .from(users)
+            .where(and(eq(users.phone, phone), ne(users.id, id)))
+            .limit(1);
+
+        if (duplicatePhone[0]) {
+            throw new BadRequest("Phone already exists");
+        }
+    }
+
     let salesImage = existingSales[0].image;
 
     if (image !== undefined) {
         if (image) {
             const result = await saveBase64Image(req, image, "sales");
-            // حذف الصورة القديمة من السيرفر بعد رفع الجديدة بنجاح
             if (existingSales[0].image) {
                 await deletePhotoFromServer(existingSales[0].image);
             }
             salesImage = result.url;
         } else {
-            // إذا تم إرسال صورة فارغة نقوم بحذف القديمة وتصفير الحقل
             if (existingSales[0].image) {
                 await deletePhotoFromServer(existingSales[0].image);
             }
@@ -165,16 +281,15 @@ export const updateSales = async (req: Request, res: Response) => {
         }
     }
 
-    const updateData: any = {
-        name: name ?? existingSales[0].name,
-        email: email ?? existingSales[0].email,
-        phone: phone !== undefined ? phone : existingSales[0].phone,
-        image: salesImage,
-        leader_id: leader_id ?? existingSales[0].leader_id,
-        target_id: target_id !== undefined ? target_id : existingSales[0].target_id,
-    };
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email;
+    if (phone !== undefined) updateData.phone = phone;
+    if (salesImage !== undefined) updateData.image = salesImage;
+    if (leader_id !== undefined) updateData.leader_id = leader_id;
+    if (status !== undefined) updateData.status = status;
+    if (target_id !== undefined) updateData.target_id = target_id;
 
-    // لو تم إرسال كلمة مرور جديدة نقوم بتشفيرها وحفظها
     if (password) {
         updateData.password = await bcrypt.hash(password, 10);
     }
@@ -186,19 +301,19 @@ export const updateSales = async (req: Request, res: Response) => {
 
 // ✅ Delete Sales
 export const deleteSales = async (req: Request, res: Response) => {
-    const { id } = req.params; 
+    const validated = await salesIdSchema.parseAsync({ params: req.params });
+    const { id } = validated.params; 
   
     const existingSales = await db
         .select()
         .from(users)
-        .where(eq(users.id, id))
+        .where(and(eq(users.id, id), eq(users.role, "sales")))
         .limit(1);
 
     if (!existingSales[0]) {
         throw new NotFound("Sales not found");
     }
 
-    // حذف الصورة الخاصة به من السيرفر قبل حذف الحساب
     if (existingSales[0].image) {
         await deletePhotoFromServer(existingSales[0].image);
     }

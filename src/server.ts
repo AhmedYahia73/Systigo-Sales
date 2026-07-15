@@ -11,6 +11,7 @@ import { startCronJobs } from "./jobs/cronJobs";
 import http from "http";
 import { Server } from "socket.io";
 import { initSocket } from "./socket";
+import { setupSwagger } from "./config/swagger"; // 👈 1. استيراد دالة Swagger هنا
 
 dotenv.config();
 
@@ -45,6 +46,9 @@ app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
+// 📝 2. تفعيل واجهة Swagger (يُفضل وضعها قبل الـ Routes الأساسية للمشروع)
+setupSwagger(app);
+
 app.get("/api/test", (req, res, next) => {
   res.json({ message: "API is working! notify token" });
 });
@@ -59,6 +63,7 @@ app.use(errorHandler);
 
 startCronJobs();
 
+// 🚀 تشغيل الخادم على البورت 3000
 httpServer.listen(3000, () => {
   console.log("Server is running on http://localhost:3000");
 });

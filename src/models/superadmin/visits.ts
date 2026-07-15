@@ -9,7 +9,7 @@ import {
   double,
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
-import { superAdminRoles } from "./targets";
+import { visitStatus } from "./visitStatus";
 
 export const visits = mysqlTable("visits", {
   id: char("id", { length: 36 }).primaryKey().default(sql`(UUID())`),

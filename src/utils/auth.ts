@@ -7,124 +7,76 @@ import "dotenv/config";
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
 
-// للـ SuperAdmin (أنت - البائع)
-export const generateSuperAdminToken = (data: {
-  id: string;
-  name: string;
-  email: string;
-}): string => {
-  const payload: TokenPayload = {
-    id: data.id,
-    email: data.email,
-    name: data.name,
-    role: "superadmin",
-  };
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
-};
-
-export const generateSubAdminToken = (data: {
-  id: string;
-  name: string;
-  email: string;
-}): string => {
-  const payload: TokenPayload = {
-    id: data.id,
-    email: data.email,
-    name: data.name,
-    role: "subadmin",
-  };
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
-};
-
-// للـ Organizer (صاحب المؤسسة)
-export const generateOrganizerToken = (data: {
-  id: string;
-  name: string;
-  email: string;
-  organizationId: string;
-}): string => {
-  const payload: TokenPayload = {
-    id: data.id,
-    email: data.email,
-    name: data.name,
-    role: "organizer",
-    organizationId: data.organizationId,
-  };
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
-};
-
-// للـ Admin (موظف بصلاحيات)
+// ✅ للـ Admin (موظف بصلاحيات إدارية كاملة)
 export const generateAdminToken = (data: {
   id: string;
   name: string;
   email: string;
-  organizationId: string;
-}): string => {
-  const payload: TokenPayload = {
-    id: data.id,
-    name: data.name,
-    email: data.email,
-    role: "admin",
-    organizationId: data.organizationId,
-  };
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
-};
-
-// للـ Driver (Mobile App)
-export const generateDriverToken = (data: {
-  id: string;
-  name: string;
-  email?: string;
-  organizationId: string;
-}): string => {
-  const payload: TokenPayload = {
-    id: data.id,
-    name: data.name,
-    email: data.email,
-    role: "driver",
-    organizationId: data.organizationId,
-  };
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
-};
-
-// للـ CoDriver (Mobile App)
-export const generateCoDriverToken = (data: {
-  id: string;
-  name: string;
-  email?: string;
-  organizationId: string;
-}): string => {
-  const payload: TokenPayload = {
-    id: data.id,
-    name: data.name,
-    email: data.email,
-    role: "codriver",
-    organizationId: data.organizationId,
-  };
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
-};
-
-
-// للـ Parent (Mobile App)
-export const generateParentToken = (data: {
-  id: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  organizationId?: string;
+  phone: string;
 }): string => {
   const payload: TokenPayload = {
     id: data.id,
     name: data.name,
     email: data.email,
     phone: data.phone,
-    role: "parent",
-    organizationId: data.organizationId,
+    role: "admin",
   };
   return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
 };
 
-// Verify Token
+// ✅ للـ Leader (قائد فريق أو مشرف على التارجت)
+export const generateLeaderToken = (data: {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+}): string => {
+  const payload: TokenPayload = {
+    id: data.id,
+    name: data.name,
+    email: data.email,
+    phone: data.phone,
+    role: "leader",
+  };
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
+};
+
+// ✅ للـ Sales (مندوب المبيعات الميداني - المسؤول عن الزيارات)
+export const generateSalesToken = (data: {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+}): string => {
+  const payload: TokenPayload = {
+    id: data.id,
+    name: data.name,
+    email: data.email,
+    phone: data.phone,
+    role: "sales",
+  };
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
+};
+
+// ✅ دالة عامة لتوليد التوكن بناءً على الدور القادم ديناميكياً من قاعدة البيانات
+export const generateUserToken = (data: {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: "admin" | "leader" | "sales";
+}): string => {
+  const payload: TokenPayload = {
+    id: data.id,
+    name: data.name,
+    email: data.email,
+    phone: data.phone,
+    role: data.role,
+  };
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
+};
+
+// 🛡️ التحقق من صحة الـ Token وفك تشفيره
 export const verifyToken = (token: string): TokenPayload => {
   try {
     return jwt.verify(token, JWT_SECRET) as TokenPayload;

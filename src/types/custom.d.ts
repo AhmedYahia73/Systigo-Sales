@@ -12,19 +12,17 @@ export interface Permission {
     actions: PermissionAction[];
 }
 
-export type SuperAdminType = "superadmin" | "subadmin";
-export type AdminType = "organizer" | "admin";
-export type MobileUserType = "driver" | "codriver" | "parent";
-export type Role = SuperAdminType | AdminType | MobileUserType;
+export type AdminType = "admin";
+export type LeaderType = "leader";
+export type SalesType = "sales";
+export type Role = AdminType | LeaderType | SalesType;
 
 export interface TokenPayload {
     id: string;
     name: string;
     role: Role;
     email?: string;
-    phone?: string;
-    organizationId?: string;
-    permissions?: Permission[];
+    phone?: string; 
 }
 
 export type AppUser = TokenPayload;

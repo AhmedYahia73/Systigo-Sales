@@ -10,8 +10,70 @@ import { BadRequest } from "../../Errors/BadRequest";
 import bcrypt from "bcrypt";
 import { saveBase64Image } from "../../utils/handleImages";
 import { deletePhotoFromServer } from "../../utils/deleteImage";
+import { z } from "zod";
 
-// ✅ Get All Leaders (للـ Organization الحالية مع الـ Targets الخاصة بهم)
+// ==========================================
+// 🛡️ Zod Validation Schemas
+// ==========================================
+
+// الـ Schema الخاص بإنشاء مستخدم Leader جديد
+export const createLeaderSchema = z.object({
+  body: z.object({
+    name: z.string({ required_error: "Name is required" })
+      .min(1, "Name cannot be empty")
+      .max(200, "Name cannot exceed 200 characters"),
+    
+    email: z.string({ required_error: "Email is required" })
+      .email("Invalid email format")
+      .max(100, "Email cannot exceed 100 characters"),
+    
+    phone: z.string({ required_error: "Phone is required" })
+      .min(5, "Phone is too short")
+      .max(20, "Phone cannot exceed 20 characters"),
+    
+    password: z.string({ required_error: "Password is required" })
+      .min(6, "Password must be at least 6 characters"),
+    
+    image: z.string().nullable().optional(),
+    
+    target_id: z.string().uuid("Invalid target ID format").nullable().optional(),
+    
+    status: z.enum(["active", "inactive"], {
+        required_error: "Status is required",
+        invalid_type_error: "Status must be either 'active' or 'inactive'",
+    }),
+  }),
+});
+
+// الـ Schema الخاص بتحديث مستخدم Leader
+export const updateLeaderSchema = z.object({
+  params: z.object({
+    id: z.string({ required_error: "ID is required" }).uuid("Invalid leader ID format"),
+  }),
+  body: z.object({
+    name: z.string().min(1, "Name cannot be empty").max(200).optional(),
+    email: z.string().email("Invalid email format").max(100).optional(),
+    phone: z.string().min(5).max(20).optional(),
+    password: z.string().min(6, "Password must be at least 6 characters").optional(),
+    image: z.string().nullable().optional(),
+    target_id: z.string().uuid("Invalid target ID format").nullable().optional(),
+    status: z.enum(["active", "inactive"]).optional(),
+  }),
+});
+
+// الـ Schema للعمليات التي تتطلب المعرف ID فقط في الـ parameters
+export const leaderIdSchema = z.object({
+  params: z.object({
+    id: z.string({ required_error: "ID is required" }).uuid("Invalid leader ID format"),
+  }),
+});
+
+
+// ==========================================
+// 🎮 Controllers
+// ==========================================
+
+// ✅ Get All Leaders
 export const getAllLeader = async (req: Request, res: Response) => {
     const allusers = await db
         .select({
@@ -22,6 +84,7 @@ export const getAllLeader = async (req: Request, res: Response) => {
             image: users.image,
             target: targets.name,
             target_number: targets.number,
+            status: users.status, 
         })
         .from(users)
         .leftJoin(targets, eq(users.target_id, targets.id))
@@ -39,12 +102,13 @@ export const lists = async (req: Request, res: Response) => {
         })
         .from(targets); 
 
-    SuccessResponse(res, { target_list: target_list }, 200);
+    SuccessResponse(res, { target_list }, 200);
 };
 
 // ✅ Get Leader By ID
 export const getLeaderById = async (req: Request, res: Response) => {
-    const { id } = req.params; 
+    const validated = await leaderIdSchema.parseAsync({ params: req.params });
+    const { id } = validated.params; 
 
     const leader = await db
         .select({
@@ -54,9 +118,10 @@ export const getLeaderById = async (req: Request, res: Response) => {
             phone: users.phone,
             image: users.image,
             target_id: users.target_id,
+            status: users.status, 
         })
         .from(users) 
-        .where(eq(users.id, id))
+        .where(and(eq(users.id, id), eq(users.role, "leader")))
         .limit(1);
 
     if (!leader[0]) {
@@ -68,9 +133,10 @@ export const getLeaderById = async (req: Request, res: Response) => {
 
 // ✅ Create Leader
 export const createLeader = async (req: Request, res: Response) => {
-    const { name, email, password, phone, image, target_id } = req.body;
+    const validated = await createLeaderSchema.parseAsync({ body: req.body });
+    const { name, email, password, phone, image, target_id, status } = validated.body;
     
-    // تحقق من عدم وجود Leader بنفس الـ email أو الـ phone
+    // تحقق من عدم وجود مستخدم آخر بنفس الـ email أو الـ phone
     const existingLeader = await db
         .select()
         .from(users)
@@ -99,6 +165,7 @@ export const createLeader = async (req: Request, res: Response) => {
         password: hashedPassword,
         role: "leader",
         target_id: target_id || null, // ربط القائد بالـ target إن وجد
+        status: status, 
     });
 
     SuccessResponse(res, { message: "Leader created successfully" }, 201);
@@ -106,21 +173,25 @@ export const createLeader = async (req: Request, res: Response) => {
 
 // ✅ Update Leader
 export const updateLeader = async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const { name, email, password, phone, image, target_id } = req.body;
+    const validated = await updateLeaderSchema.parseAsync({ 
+        params: req.params, 
+        body: req.body 
+    });
+    const { id } = validated.params;
+    const { name, email, password, phone, image, target_id, status } = validated.body;
     
     // تحقق من وجود الـ Leader
     const existingLeader = await db
         .select()
         .from(users)
-        .where(eq(users.id, id))
+        .where(and(eq(users.id, id), eq(users.role, "leader")))
         .limit(1);
 
     if (!existingLeader[0]) {
         throw new NotFound("Leader not found");
     }
 
-    // لو قام بتغيير الـ email، نتحقق إنه مش مكرر لمستخدم آخر
+    // تحقق من الـ email لو تم تعديله ولم يكرر مع حساب آخر
     if (email && email !== existingLeader[0].email) {
         const duplicateEmail = await db
             .select()
@@ -133,11 +204,24 @@ export const updateLeader = async (req: Request, res: Response) => {
         }
     } 
 
+    // تحقق من الـ phone لو تم تعديله ولم يكرر مع حساب آخر
+    if (phone && phone !== existingLeader[0].phone) {
+        const duplicatePhone = await db
+            .select()
+            .from(users)
+            .where(and(eq(users.phone, phone), ne(users.id, id)))
+            .limit(1);
+
+        if (duplicatePhone[0]) {
+            throw new BadRequest("Phone already exists");
+        }
+    }
+
     let leaderImage = existingLeader[0].image;
 
     if (image !== undefined) {
         if (image) {
-            const result = await saveBase64Image(req, image, "leader");
+            const result = await saveBase64Image(req, image, "leaders");
             // حذف الصورة القديمة من السيرفر بعد رفع الصورة الجديدة بنجاح
             if (existingLeader[0].image) {
                 await deletePhotoFromServer(existingLeader[0].image);
@@ -152,13 +236,14 @@ export const updateLeader = async (req: Request, res: Response) => {
         }
     }
 
-    const updateData: any = {
-        name: name ?? existingLeader[0].name,
-        email: email ?? existingLeader[0].email,
-        phone: phone !== undefined ? phone : existingLeader[0].phone,
-        image: leaderImage,
-        target_id: target_id !== undefined ? target_id : existingLeader[0].target_id,
-    };
+    // بناء كائن البيانات المحدثة مع تلافي القيم الـ undefined
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email;
+    if (phone !== undefined) updateData.phone = phone;
+    if (leaderImage !== undefined) updateData.image = leaderImage;
+    if (status !== undefined) updateData.status = status;
+    if (target_id !== undefined) updateData.target_id = target_id;
 
     // لو تم إرسال password جديد
     if (password) {
@@ -172,12 +257,13 @@ export const updateLeader = async (req: Request, res: Response) => {
 
 // ✅ Delete Leader
 export const deleteLeader = async (req: Request, res: Response) => {
-    const { id } = req.params;  
+    const validated = await leaderIdSchema.parseAsync({ params: req.params });
+    const { id } = validated.params; 
 
     const existingLeader = await db
         .select()
         .from(users)
-        .where(eq(users.id, id))
+        .where(and(eq(users.id, id), eq(users.role, "leader")))
         .limit(1);
 
     if (!existingLeader[0]) {
