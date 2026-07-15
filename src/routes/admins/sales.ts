@@ -10,13 +10,13 @@ import {
 } from "../../controllers/admin/sales";
 import { catchAsync } from "../../utils/catchAsync";
 import { validate } from "../../middlewares/validation";
-import { checkOnlyAdmin } from "../../middlewares/checkpermission";
+import { checkAdminLeader } from "../../middlewares/checkpermission";
 
 const router = Router(); 
-router.get("/",checkOnlyAdmin(), catchAsync(getAllSales));
-router.get("/lists",checkOnlyAdmin(), catchAsync(lists));
-router.get("/:id",checkOnlyAdmin(), catchAsync(getSalesById));
-router.post("/",checkOnlyAdmin(), catchAsync(createSales));
-router.put("/:id",checkOnlyAdmin(), catchAsync(updateSales));
-router.delete("/:id",checkOnlyAdmin(), catchAsync(deleteSales));
+router.get("/",checkAdminLeader(), catchAsync(getAllSales));
+router.get("/lists",checkAdminLeader(), catchAsync(lists));
+router.get("/:id",checkAdminLeader(), catchAsync(getSalesById));
+router.post("/",checkAdminLeader(), catchAsync(createSales));
+router.put("/:id",checkAdminLeader(), catchAsync(updateSales));
+router.delete("/:id",checkAdminLeader(), catchAsync(deleteSales));
 export default router;

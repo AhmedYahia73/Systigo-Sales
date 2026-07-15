@@ -7,6 +7,7 @@ import {
   timestamp,
   mysqlEnum,
   char,
+  AnyMySqlColumn
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
 import { targets } from "./targets"; 
@@ -20,7 +21,7 @@ export const users = mysqlTable("users", {
   password: varchar("password", { length: 255 }).notNull(),
   status: mysqlEnum("status", ["active", "inactive"]).default("active"),
   role: mysqlEnum("role", ["admin", "leader", "sales"]).notNull().default("sales"),
-  leader_id: char("leader_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+  leader_id: char("leader_id", { length: 36 }).references((): AnyMySqlColumn => users.id, { onDelete: "set null" }),
   target_id: char("target_id", { length: 36 }).references(() => targets.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),

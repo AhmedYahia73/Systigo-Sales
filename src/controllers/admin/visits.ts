@@ -1,11 +1,10 @@
-// src/controllers/Sales/SalesController.ts
-
 import { Request, Response } from "express";
 import { db } from "../../models/db";
-import { visits, visitStatus } from "../../models/schema";
+import { users, visits, visitStatus } from "../../models/schema";
 import { eq } from "drizzle-orm";
 import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound";
+import { BadRequest } from "../../Errors/BadRequest"; // تأكد من وجود هذا الـ Error Handler أو استبدله بما يتوافق مع مشروعك
 import { z } from "zod";
 
 // ==========================================
@@ -45,6 +44,14 @@ export const createVisitSchema = z.object({
     }).optional(),
 
     status_id: z.string().uuid("Invalid status ID format").nullable().optional(),
+    sales_id: z.string({ required_error: "Sales ID is required" }).uuid("Invalid sales ID format"),
+  }),
+});
+
+// الـ Schema الخاص بالتحقق من الـ sales_id عند جلب كل الزيارات التابعة له
+export const SalesVisitSchema = z.object({
+  body: z.object({ 
+    sales_id: z.string({ required_error: "Sales ID is required" }).uuid("Invalid sales ID format"),
   }),
 });
 
@@ -62,6 +69,7 @@ export const updateVisitSchema = z.object({
     phone: z.string().min(5).max(20).optional(),
     status: z.enum(["visit", "sales", "delivered"]).optional(),
     status_id: z.string().uuid("Invalid status ID format").nullable().optional(),
+    sales_id: z.string().uuid("Invalid sales ID format").nullable().optional(),
   }),
 });
 
@@ -77,8 +85,22 @@ export const VisitIdSchema = z.object({
 // 🎮 Controllers
 // ==========================================
 
-// ✅ Get All Visits
+// ✅ Get All Visits (Filtered by Sales ID)
 export const getAllVisits = async (req: Request, res: Response) => { 
+    const validated = await SalesVisitSchema.parseAsync({ body: req.body });
+    const { sales_id } = validated.body;
+
+    // التحقق من أن الـ sales_id موجود بالفعل في قاعدة البيانات قبل جلب زياراته
+    const salesExist = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.id, sales_id))
+        .limit(1);
+
+    if (!salesExist[0]) {
+        throw new BadRequest("The provided sales_id does not exist.");
+    }
+
     const allVisitsRaw = await db
         .select({
             id: visits.id, 
@@ -89,9 +111,15 @@ export const getAllVisits = async (req: Request, res: Response) => {
             notes: visits.notes,
             phone: visits.phone,
             status: visits.status,
+            visit_status: visitStatus.name,
             status_id: visits.status_id,
+            sales: users.name,
+            sales_phone: users.phone,
         })
-        .from(visits); 
+        .from(visits)
+        .where(eq(visits.sales_id, sales_id))
+        .leftJoin(users, eq(visits.sales_id, users.id))
+        .leftJoin(visitStatus, eq(visits.status_id, visitStatus.id)); 
 
     // إضافة رابط الخريطة تلقائياً لكل زيارة
     const allVisits = allVisitsRaw.map((visit) => ({
@@ -102,7 +130,7 @@ export const getAllVisits = async (req: Request, res: Response) => {
     SuccessResponse(res, { allVisits }, 200);
 }; 
 
-// ✅ Get All Visits
+// ✅ Get Active Visit Statuses
 export const lists = async (req: Request, res: Response) => { 
     const visit_status = await db
         .select({
@@ -131,6 +159,7 @@ export const getVisitsById = async (req: Request, res: Response) => {
             phone: visits.phone,
             status: visits.status,
             status_id: visits.status_id,
+            sales_id: visits.sales_id,
         })
         .from(visits) 
         .where(eq(visits.id, id))
@@ -152,8 +181,32 @@ export const getVisitsById = async (req: Request, res: Response) => {
 // ✅ Create Visits
 export const createVisits = async (req: Request, res: Response) => {
     const validated = await createVisitSchema.parseAsync({ body: req.body });
-    const { lat, lng, name, address, notes, phone, status, status_id } = validated.body;
+    const { lat, lng, name, address, notes, phone, status, status_id, sales_id } = validated.body;
     
+    // 🔍 التحقق من صحة وجود الـ sales_id في جدول المستخدمين (users)
+    const salesExist = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.id, sales_id))
+        .limit(1);
+
+    if (!salesExist[0]) {
+        throw new BadRequest("The assigned sales_id does not exist.");
+    }
+
+    // 🔍 التحقق من صحة وجود الـ status_id في جدول الحالات (visitStatus) إن أُرسل
+    if (status_id) {
+        const statusExist = await db
+            .select({ id: visitStatus.id })
+            .from(visitStatus)
+            .where(eq(visitStatus.id, status_id))
+            .limit(1);
+
+        if (!statusExist[0]) {
+            throw new BadRequest("The assigned status_id does not exist.");
+        }
+    }
+
     await db.insert(visits).values({ 
         lat,
         lng,
@@ -161,8 +214,9 @@ export const createVisits = async (req: Request, res: Response) => {
         address,
         notes: notes || null,
         phone,
-        status: status || "visit", // القيمة الافتراضية للـ Enum
+        status: status || "visit", 
         status_id: status_id || null,
+        sales_id,
     });
 
     SuccessResponse(res, { message: "Visit created successfully" }, 201);
@@ -175,9 +229,9 @@ export const updateVisits = async (req: Request, res: Response) => {
         body: req.body 
     });
     const { id } = validated.params;
-    const { lat, lng, name, address, notes, phone, status, status_id } = validated.body;
+    const { lat, lng, name, address, notes, phone, status, status_id, sales_id } = validated.body;
   
-    // التأكد من وجود الزيارة قبل تحديثها
+    // 🔍 1. التأكد من وجود الزيارة الأصلية
     const existingVisits = await db
         .select()
         .from(visits)
@@ -186,6 +240,32 @@ export const updateVisits = async (req: Request, res: Response) => {
 
     if (!existingVisits[0]) {
         throw new NotFound("Visit not found");
+    }
+
+    // 🔍 2. إذا تم طلب تحديث الـ sales_id، نتأكد أنه مستخدم حقيقي وموجود
+    if (sales_id !== undefined && sales_id !== null) {
+        const salesExist = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.id, sales_id))
+            .limit(1);
+
+        if (!salesExist[0]) {
+            throw new BadRequest("The updated sales_id does not exist.");
+        }
+    }
+
+    // 🔍 3. إذا تم طلب تحديث الـ status_id، نتأكد أنه حالة حقيقية وموجودة
+    if (status_id !== undefined && status_id !== null) {
+        const statusExist = await db
+            .select({ id: visitStatus.id })
+            .from(visitStatus)
+            .where(eq(visitStatus.id, status_id))
+            .limit(1);
+
+        if (!statusExist[0]) {
+            throw new BadRequest("The updated status_id does not exist.");
+        }
     }
 
     // بناء كائن التحديث بشكل ديناميكي
@@ -198,6 +278,7 @@ export const updateVisits = async (req: Request, res: Response) => {
     if (phone !== undefined) updateData.phone = phone;
     if (status !== undefined) updateData.status = status;
     if (status_id !== undefined) updateData.status_id = status_id;
+    if (sales_id !== undefined) updateData.sales_id = sales_id;
 
     await db.update(visits).set(updateData).where(eq(visits.id, id));
 

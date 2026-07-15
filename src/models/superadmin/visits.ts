@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
 import { visitStatus } from "./visitStatus";
+import { users } from "./users";
 
 export const visits = mysqlTable("visits", {
   id: char("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
@@ -22,6 +23,7 @@ export const visits = mysqlTable("visits", {
  
   status: mysqlEnum("status", ["visit", "sales", "delivered"]).default("visit"),
   status_id: char("status_id", { length: 36 }).references(() => visitStatus.id, { onDelete: "set null" }),
+  sales_id: char("sales_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
