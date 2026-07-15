@@ -11,6 +11,45 @@ const drizzle_orm_1 = require("drizzle-orm");
 // };
 // داخل export
 //   permissions: json("permissions").$type<SuperAdminPermission[]>().default([]),
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     Target:
+ *       type: object
+ *       required:
+ *         - name
+ *         - number
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *           description: Auto-generated UUID for the target
+ *           example: "t1111111-1111-1111-1111-111111111111"
+ *         type:
+ *           type: string
+ *           enum: [visit, sales]
+ *           default: visit
+ *           description: The type of target (visit count or sales amount)
+ *           example: "sales"
+ *         name:
+ *           type: string
+ *           description: The name/title of the target
+ *           example: "تارجت مبيعات الربع الأول"
+ *         number:
+ *           type: number
+ *           format: double
+ *           description: The target metric number (value in currency or visits count)
+ *           example: 150000.00
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Creation timestamp
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Last update timestamp
+ */
 exports.targets = (0, mysql_core_1.mysqlTable)("targets", {
     id: (0, mysql_core_1.char)("id", { length: 36 }).primaryKey().default((0, drizzle_orm_1.sql) `(UUID())`),
     type: (0, mysql_core_1.mysqlEnum)("type", ["visit", "sales"]).default("visit"),

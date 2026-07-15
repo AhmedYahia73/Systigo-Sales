@@ -17,7 +17,7 @@ const options = {
         },
         servers: [
             {
-                url: "http://localhost:5000", // قم بتعديل البورت والمضيف حسب مشروعك
+                url: "http://localhost:3000",
                 description: "Development Server",
             },
         ],
@@ -31,13 +31,18 @@ const options = {
             },
         },
     },
-    // المسار الذي سيبحث فيه Swagger عن التعليقات المكتوبة لتوثيق الـ Routes
-    apis: ["./src/routes/**/*.ts", "./src/controllers/**/*.ts"],
+    // 🔥 التعديل هنا: البحث بعمق داخل المجلدات الفرعية لملفات الـ TypeScript والـ JavaScript
+    apis: [
+        "./src/routes/**/*.ts", // يبحث في routes وأي مجلد فرعي داخلها مثل routes/admins
+        "./src/controllers/**/*.ts", // يبحث في controllers وأي مجلد فرعي داخلها مثل controllers/admin
+        "./dist/routes/**/*.js", // للاستخدام بعد عمل build للمشروع
+        "./dist/controllers/**/*.js" // للاستخدام بعد عمل build للمشروع
+    ],
 };
 const swaggerSpec = (0, swagger_jsdoc_1.default)(options);
 const setupSwagger = (app) => {
     // رابط عرض واجهة Swagger
     app.use("/api-docs", swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup(swaggerSpec));
-    console.log("📝 Swagger documentation is available at http://localhost:5000/api-docs");
+    console.log("📝 Swagger documentation is available at http://localhost:3000/api-docs");
 };
 exports.setupSwagger = setupSwagger;
