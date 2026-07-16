@@ -17,7 +17,7 @@ const wishList_1 = __importDefault(require("./wishList"));
 const express_1 = require("express");
 const route = (0, express_1.Router)();
 route.use("/auth", (0, catchAsync_1.catchAsync)(auth_1.default));
-route.use(authenticated_1.authenticated, (0, authorized_1.authorizeRoles)("admin", "organizer"));
+route.use(authenticated_1.authenticated, (0, authorized_1.authorizeRoles)("admin", "leader", "sales"));
 route.use("/leader", (0, catchAsync_1.catchAsync)(leader_1.default));
 route.use("/sales", (0, catchAsync_1.catchAsync)(sales_1.default));
 route.use("/visit_status", (0, catchAsync_1.catchAsync)(status_1.default));

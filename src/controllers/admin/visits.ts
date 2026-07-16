@@ -118,7 +118,8 @@ export const getAllVisits = async (req: Request, res: Response) => {
         const teamSales = await db
             .select({ id: users.id })
             .from(users)
-            .where(and(eq(users.leader_id, userId!), eq(users.role, "sales")));
+            .where(or(and(eq(users.leader_id, userId!), eq(users.role, "sales")), 
+            eq(users.id, userId!)));
         
         const salesIds = teamSales.map(s => s.id);
 
@@ -225,7 +226,8 @@ export const createVisits = async (req: Request, res: Response) => {
     const salesExist = await db
         .select({ id: users.id })
         .from(users)
-        .where(and(eq(users.id, sales_id), eq(users.role, "sales")))
+        .where(and(eq(users.id, sales_id), 
+        or(eq(users.role, "sales"), eq(users.role, "leader"))))
         .limit(1);
 
     if (!salesExist[0]) {
@@ -296,7 +298,8 @@ export const updateVisits = async (req: Request, res: Response) => {
         const salesExist = await db
             .select({ id: users.id })
             .from(users)
-            .where(and(eq(users.id, sales_id), eq(users.role, "sales")))
+            .where(and(eq(users.id, sales_id), 
+            or(eq(users.role, "sales"), eq(users.role, "leader"))))
             .limit(1);
 
         if (!salesExist[0]) {

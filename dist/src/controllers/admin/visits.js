@@ -105,7 +105,7 @@ const getAllVisits = async (req, res) => {
         const teamSales = await db_1.db
             .select({ id: schema_1.users.id })
             .from(schema_1.users)
-            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.leader_id, userId), (0, drizzle_orm_1.eq)(schema_1.users.role, "sales")));
+            .where((0, drizzle_orm_1.or)((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.leader_id, userId), (0, drizzle_orm_1.eq)(schema_1.users.role, "sales")), (0, drizzle_orm_1.eq)(schema_1.users.id, userId)));
         const salesIds = teamSales.map(s => s.id);
         if (querySalesId) {
             if (salesIds.includes(querySalesId)) {
@@ -204,7 +204,7 @@ const createVisits = async (req, res) => {
     const salesExist = await db_1.db
         .select({ id: schema_1.users.id })
         .from(schema_1.users)
-        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.id, sales_id), (0, drizzle_orm_1.eq)(schema_1.users.role, "sales")))
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.id, sales_id), (0, drizzle_orm_1.or)((0, drizzle_orm_1.eq)(schema_1.users.role, "sales"), (0, drizzle_orm_1.eq)(schema_1.users.role, "leader"))))
         .limit(1);
     if (!salesExist[0]) {
         throw new BadRequest_1.BadRequest("The assigned sales_id does not exist or user is not a sales member.");
@@ -265,7 +265,7 @@ const updateVisits = async (req, res) => {
         const salesExist = await db_1.db
             .select({ id: schema_1.users.id })
             .from(schema_1.users)
-            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.id, sales_id), (0, drizzle_orm_1.eq)(schema_1.users.role, "sales")))
+            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.id, sales_id), (0, drizzle_orm_1.or)((0, drizzle_orm_1.eq)(schema_1.users.role, "sales"), (0, drizzle_orm_1.eq)(schema_1.users.role, "leader"))))
             .limit(1);
         if (!salesExist[0]) {
             throw new BadRequest_1.BadRequest("The updated sales_id does not exist.");

@@ -12,7 +12,7 @@ import wishListRouter from "./wishList";
 import { Router } from "express";
 const route = Router();
 route.use("/auth", catchAsync(AuthRoute));
-route.use(authenticated, authorizeRoles("admin", "organizer"));
+route.use(authenticated, authorizeRoles("admin", "leader", "sales"));
 route.use("/leader", catchAsync(leaderRouter));
 route.use("/sales", catchAsync(salesRouter));
 route.use("/visit_status", catchAsync(statusRouter));
