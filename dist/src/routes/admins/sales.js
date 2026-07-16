@@ -278,7 +278,7 @@ router.post("/", (0, checkpermission_1.checkAdminLeader)(), (0, catchAsync_1.cat
  *       401:
  *         description: Unauthorized
  */
-router.put("/:id", (0, checkpermission_1.checkAdminLeader)(), (0, catchAsync_1.catchAsync)(sales_1.updateSales));
+router.put("/:id", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(sales_1.updateSales));
 /**
  * @swagger
  * /api/admin/sales/{id}:
@@ -311,5 +311,5 @@ router.put("/:id", (0, checkpermission_1.checkAdminLeader)(), (0, catchAsync_1.c
  *       401:
  *         description: Unauthorized
  */
-router.delete("/:id", (0, checkpermission_1.checkAdminLeader)(), (0, catchAsync_1.catchAsync)(sales_1.deleteSales));
+router.delete("/:id", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(sales_1.deleteSales));
 exports.default = router;

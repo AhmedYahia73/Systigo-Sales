@@ -4,7 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteSales = exports.updateSales = exports.createSales = exports.getSalesById = exports.lists = exports.getAllSales = exports.salesIdSchema = exports.updateSalesSchema = exports.createSalesSchema = void 0;
+exports.deleteSales = exports.updateSales = exports.createSales = exports.getSalesById = exports.lists = exports.getAllSales = exports.salesIdSchema = exports.updateSalesSchema = exports.getCreateSalesSchema = void 0;
 const db_1 = require("../../models/db");
 const schema_1 = require("../../models/schema");
 const drizzle_orm_1 = require("drizzle-orm");
@@ -18,30 +18,35 @@ const zod_1 = require("zod");
 // ==========================================
 // 🛡️ Zod Validation Schemas
 // ==========================================
-// الـ Schema الخاص بإنشاء مستخدم Sales جديد
-exports.createSalesSchema = zod_1.z.object({
-    body: zod_1.z.object({
-        name: zod_1.z.string({ required_error: "Name is required" })
-            .min(1, "Name cannot be empty")
-            .max(200, "Name cannot exceed 200 characters"),
-        email: zod_1.z.string({ required_error: "Email is required" })
-            .email("Invalid email format")
-            .max(100, "Email cannot exceed 100 characters"),
-        phone: zod_1.z.string({ required_error: "Phone is required" })
-            .min(5, "Phone is too short")
-            .max(20, "Phone cannot exceed 20 characters"),
-        password: zod_1.z.string({ required_error: "Password is required" })
-            .min(6, "Password must be at least 6 characters"),
-        image: zod_1.z.string().nullable().optional(),
-        leader_id: zod_1.z.string({ required_error: "Leader ID is required" })
-            .uuid("Invalid leader ID format"),
-        target_id: zod_1.z.string().uuid("Invalid target ID format").nullable().optional(),
-        status: zod_1.z.enum(["active", "inactive"], {
-            required_error: "Status is required",
-            invalid_type_error: "Status must be either 'active' or 'inactive'",
+// الـ Schema الخاص بإنشاء مستخدم Sales (ديناميكي بناءً على الـ Role)
+const getCreateSalesSchema = (userRole) => {
+    return zod_1.z.object({
+        body: zod_1.z.object({
+            name: zod_1.z.string({ required_error: "Name is required" })
+                .min(1, "Name cannot be empty")
+                .max(200, "Name cannot exceed 200 characters"),
+            email: zod_1.z.string({ required_error: "Email is required" })
+                .email("Invalid email format")
+                .max(100, "Email cannot exceed 100 characters"),
+            phone: zod_1.z.string({ required_error: "Phone is required" })
+                .min(5, "Phone is too short")
+                .max(20, "Phone cannot exceed 20 characters"),
+            password: zod_1.z.string({ required_error: "Password is required" })
+                .min(6, "Password must be at least 6 characters"),
+            image: zod_1.z.string().nullable().optional(),
+            // إذا كان الـ role هو leader، نجعل الحقل اختياري لأننا سنأخذه تلقائياً من الـ Token
+            leader_id: userRole === "leader"
+                ? zod_1.z.string().uuid("Invalid leader ID format").optional()
+                : zod_1.z.string({ required_error: "Leader ID is required" }).uuid("Invalid leader ID format"),
+            target_id: zod_1.z.string().uuid("Invalid target ID format").nullable().optional(),
+            status: zod_1.z.enum(["active", "inactive"], {
+                required_error: "Status is required",
+                invalid_type_error: "Status must be either 'active' or 'inactive'",
+            }),
         }),
-    }),
-});
+    });
+};
+exports.getCreateSalesSchema = getCreateSalesSchema;
 // الـ Schema الخاص بتحديث مستخدم Sales
 exports.updateSalesSchema = zod_1.z.object({
     params: zod_1.z.object({
@@ -71,7 +76,8 @@ exports.salesIdSchema = zod_1.z.object({
 const getAllSales = async (req, res) => {
     // جلب قائد الفريق الآخر بربط ذاتي (Self Join) لعرض بيانات الـ Leader
     const leaderAlias = db_1.db.$with("leaderAlias").as(db_1.db.select().from(schema_1.users));
-    const allusers = await db_1.db
+    // 1. نبني الاستعلام الأساسي دون تنفيذ (بشكل مرن)
+    let query = db_1.db
         .with(leaderAlias)
         .select({
         id: schema_1.users.id,
@@ -88,7 +94,18 @@ const getAllSales = async (req, res) => {
         .from(schema_1.users)
         .leftJoin(schema_1.targets, (0, drizzle_orm_1.eq)(schema_1.users.target_id, schema_1.targets.id))
         .leftJoin(leaderAlias, (0, drizzle_orm_1.eq)(schema_1.users.leader_id, leaderAlias.id))
-        .where((0, drizzle_orm_1.eq)(schema_1.users.role, "sales"));
+        .$dynamic(); // تفعيل الوضع الديناميكي لـ Drizzle لتركيب شروط لاحقاً
+    // 2. فحص الـ Role وتطبيق الفلترة المناسبة قبل التنفيذ
+    if (req.user?.role === "leader") {
+        // إذا كان الفاعل قائد فريق، نُظهر له فقط الـ Sales التابعين له
+        query = query.where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.role, "sales"), (0, drizzle_orm_1.eq)(schema_1.users.leader_id, req.user.id)));
+    }
+    else {
+        // للأدمن أو الأونر نُظهر جميع الـ Sales
+        query = query.where((0, drizzle_orm_1.eq)(schema_1.users.role, "sales"));
+    }
+    // 3. تنفيذ الاستعلام النهائي وجلب البيانات
+    const allusers = await query;
     (0, response_1.SuccessResponse)(res, { sales: allusers }, 200);
 };
 exports.getAllSales = getAllSales;
@@ -136,9 +153,21 @@ const getSalesById = async (req, res) => {
 exports.getSalesById = getSalesById;
 // ✅ Create Sales
 const createSales = async (req, res) => {
-    const validated = await exports.createSalesSchema.parseAsync({ body: req.body });
-    const { name, email, password, phone, image, target_id, leader_id, status } = validated.body;
-    // 1. تحقق من وجود الـ Leader وصحة الـ Role الخاص به
+    // 1. التحقق من البيانات عبر الـ Schema الديناميكية
+    const validated = await (0, exports.getCreateSalesSchema)(req.user?.role).parseAsync({ body: req.body });
+    const { name, email, password, phone, image, target_id, status } = validated.body;
+    // 2. تحديد الـ leader_id بناءً على الـ Role لمنع التلاعب بالبيانات
+    let leader_id;
+    if (req.user?.role === "leader") {
+        leader_id = req.user.id; // يتم إجبار استخدام الـ ID الخاص به
+    }
+    else {
+        leader_id = validated.body.leader_id; // يتم أخذه من المدخلات المفحوصة للأدمن أو الأونر
+    }
+    if (!leader_id) {
+        throw new BadRequest_1.BadRequest("Leader ID is required for this operation");
+    }
+    // 3. تحقق من وجود الـ Leader وصحة الـ Role الخاص به
     const targetLeader = await db_1.db
         .select()
         .from(schema_1.users)
@@ -147,7 +176,7 @@ const createSales = async (req, res) => {
     if (!targetLeader[0]) {
         throw new BadRequest_1.BadRequest("The assigned leader was not found or is invalid");
     }
-    // 2. تحقق من عدم تكرار البريد الإلكتروني أو الهاتف لحساب آخر
+    // 4. تحقق من عدم تكرار البريد الإلكتروني أو الهاتف لحساب آخر
     const existingSales = await db_1.db
         .select()
         .from(schema_1.users)
@@ -156,13 +185,14 @@ const createSales = async (req, res) => {
     if (existingSales[0]) {
         throw new BadRequest_1.BadRequest("Email or Phone already exists");
     }
-    // تشفير كلمة المرور
+    // 5. تشفير كلمة المرور
     const hashedPassword = await bcrypt_1.default.hash(password, 10);
     let savedSalesImage = null;
     if (image) {
         const result = await (0, handleImages_1.saveBase64Image)(req, image, "sales");
         savedSalesImage = result.url;
     }
+    // 6. إدخال البيانات في قاعدة البيانات
     await db_1.db.insert(schema_1.users).values({
         name,
         email,
@@ -184,8 +214,8 @@ const updateSales = async (req, res) => {
         body: req.body
     });
     const { id } = validated.params;
-    const { name, email, password, phone, image, target_id, leader_id, status } = validated.body;
-    // 1. تحقق من وجود الـ Sales نفسه وصحة الـ Role
+    const { name, email, password, phone, image, target_id, status } = validated.body;
+    // 1. التحقق من وجود الـ Sales نفسه وصحة الـ Role
     const existingSales = await db_1.db
         .select()
         .from(schema_1.users)
@@ -194,7 +224,15 @@ const updateSales = async (req, res) => {
     if (!existingSales[0]) {
         throw new NotFound_1.NotFound("Sales not found");
     }
-    // 2. تحقق من صحة الـ Leader الجديد إذا تم إرساله
+    // 2. حماية وتأمين الـ leader_id عند التحديث
+    let leader_id;
+    if (req.user?.role === "leader") {
+        leader_id = req.user.id; // القائد لا يمكنه تعديل القائد التابع له السيلز
+    }
+    else {
+        leader_id = validated.body.leader_id; // للأونر أو الأدمن يمكنهم تعديله إذا تم إرساله
+    }
+    // 3. تحقق من صحة الـ Leader الجديد إذا تم تعديله أو إرساله
     if (leader_id) {
         const targetLeader = await db_1.db
             .select()
@@ -205,7 +243,7 @@ const updateSales = async (req, res) => {
             throw new BadRequest_1.BadRequest("The assigned leader was not found or is invalid");
         }
     }
-    // 3. تحقق من البريد الإلكتروني المكرر
+    // 4. تحقق من البريد الإلكتروني المكرر لغير هذا الحساب
     if (email && email !== existingSales[0].email) {
         const duplicateEmail = await db_1.db
             .select()
@@ -216,7 +254,7 @@ const updateSales = async (req, res) => {
             throw new BadRequest_1.BadRequest("Email already exists");
         }
     }
-    // 4. تحقق من الهاتف المكرر
+    // 5. تحقق من الهاتف المكرر لغير هذا الحساب
     if (phone && phone !== existingSales[0].phone) {
         const duplicatePhone = await db_1.db
             .select()
@@ -227,6 +265,7 @@ const updateSales = async (req, res) => {
             throw new BadRequest_1.BadRequest("Phone already exists");
         }
     }
+    // 6. معالجة الصور والتعديلات عليها
     let salesImage = existingSales[0].image;
     if (image !== undefined) {
         if (image) {
@@ -243,6 +282,7 @@ const updateSales = async (req, res) => {
             salesImage = null;
         }
     }
+    // 7. بناء كائن التعديل لتجنب إرسال undefined لقاعدة البيانات
     const updateData = {};
     if (name !== undefined)
         updateData.name = name;
