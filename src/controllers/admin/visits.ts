@@ -1,83 +1,77 @@
 import { Request, Response } from "express";
 import { db } from "../../models/db";
 import { users, visits, visitStatus } from "../../models/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, or, inArray } from "drizzle-orm";
 import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound";
-import { BadRequest } from "../../Errors/BadRequest"; // تأكد من وجود هذا الـ Error Handler أو استبدله بما يتوافق مع مشروعك
+import { BadRequest } from "../../Errors/BadRequest";
 import { z } from "zod";
 
 // ==========================================
 // 🛡️ Zod Validation Schemas
 // ==========================================
 
-// الـ Schema الخاص بإنشاء Visit جديد
-export const createVisitSchema = z.object({
-  body: z.object({ 
-    lat: z.number({ required_error: "Latitude (lat) is required" })
-      .min(-90, "Latitude must be between -90 and 90")
-      .max(90, "Latitude must be between -90 and 90"),
-    
-    lng: z.number({ required_error: "Longitude (lng) is required" })
-      .min(-180, "Longitude must be between -180 and 180")
-      .max(180, "Longitude must be between -180 and 180"),
-    
-    name: z.string({ required_error: "Name is required" })
-      .min(1, "Name cannot be empty")
-      .max(255, "Name cannot exceed 255 characters"),
-    
-    address: z.string({ required_error: "Address is required" })
-      .min(1, "Address cannot be empty")
-      .max(500, "Address cannot exceed 500 characters"),
-    
-    notes: z.string()
-      .max(1000, "Notes cannot exceed 1000 characters")
-      .nullable()
-      .optional(),
-    
-    phone: z.string({ required_error: "Phone is required" })
-      .min(5, "Phone number is too short")
-      .max(20, "Phone cannot exceed 20 characters"),
-    
-    status: z.enum(["visit", "sales", "delivered"], {
-      invalid_type_error: "Status must be either 'visit', 'sales', or 'delivered'",
-    }).optional(),
+export const createVisitSchema = (userRole?: string) => {
+    return z.object({
+        body: z.object({ 
+            lat: z.number({ required_error: "Latitude (lat) is required" })
+                .min(-90, "Latitude must be between -90 and 90")
+                .max(90, "Latitude must be between -90 and 90"),
+            
+            lng: z.number({ required_error: "Longitude (lng) is required" })
+                .min(-180, "Longitude must be between -180 and 180")
+                .max(180, "Longitude must be between -180 and 180"),
+            
+            name: z.string({ required_error: "Name is required" })
+                .min(1, "Name cannot be empty")
+                .max(255, "Name cannot exceed 255 characters"),
+            
+            address: z.string({ required_error: "Address is required" })
+                .min(1, "Address cannot be empty")
+                .max(500, "Address cannot exceed 500 characters"),
+            
+            notes: z.string()
+                .max(1000, "Notes cannot exceed 1000 characters")
+                .nullable()
+                .optional(),
+            
+            phone: z.string({ required_error: "Phone is required" })
+                .min(5, "Phone number is too short")
+                .max(20, "Phone cannot exceed 20 characters"),
+            
+            status: z.enum(["visit", "sales", "delivered"], {
+                invalid_type_error: "Status must be either 'visit', 'sales', or 'delivered'",
+            }).optional(),
 
-    status_id: z.string().nullable().optional(),
-    sales_id: z.string({ required_error: "Sales ID is required" }),
-  }),
-});
+            status_id: z.string().uuid("Invalid status ID format").nullable().optional(),
+            sales_id: userRole === "sales" || userRole === "leader"
+                ? z.string().uuid().optional()
+                : z.string({ required_error: "Sales ID is required" }).uuid("Invalid sales ID format"),
+        }),
+    }); 
+};
 
-// الـ Schema الخاص بالتحقق من الـ sales_id عند جلب كل الزيارات التابعة له
-export const SalesVisitSchema = z.object({
-  body: z.object({ 
-    sales_id: z.string({ required_error: "Sales ID is required" }).uuid("Invalid sales ID format"),
-  }),
-});
-
-// الـ Schema الخاص بتحديث Visit
 export const updateVisitSchema = z.object({
-  params: z.object({
-    id: z.string({ required_error: "ID is required in parameters" }).uuid("Invalid ID format"),
-  }),
-  body: z.object({ 
-    lat: z.number().min(-90).max(90).optional(),
-    lng: z.number().min(-180).max(180).optional(),
-    name: z.string().min(1).max(255).optional(),
-    address: z.string().min(1).max(500).optional(),
-    notes: z.string().max(1000).nullable().optional(),
-    phone: z.string().min(5).max(20).optional(),
-    status: z.enum(["visit", "sales", "delivered"]).optional(),
-    status_id: z.string().nullable().optional(),
-    sales_id: z.string().nullable().optional(),
-  }),
+    params: z.object({
+        id: z.string({ required_error: "ID is required in parameters" }).uuid("Invalid ID format"),
+    }),
+    body: z.object({ 
+        lat: z.number().min(-90).max(90).optional(),
+        lng: z.number().min(-180).max(180).optional(),
+        name: z.string().min(1).max(255).optional(),
+        address: z.string().min(1).max(500).optional(),
+        notes: z.string().max(1000).nullable().optional(),
+        phone: z.string().min(5).max(20).optional(),
+        status: z.enum(["visit", "sales", "delivered"]).optional(),
+        status_id: z.string().uuid("Invalid status ID format").nullable().optional(),
+        sales_id: z.string().uuid("Invalid sales ID format").nullable().optional(),
+    }),
 });
 
-// الـ Schema الخاص بالعمليات التي تتطلب ID فقط
 export const VisitIdSchema = z.object({
-  params: z.object({
-    id: z.string({ required_error: "ID is required in parameters" }).uuid("Invalid ID format"),
-  }),
+    params: z.object({
+        id: z.string({ required_error: "ID is required in parameters" }).uuid("Invalid ID format"),
+    }),
 }); 
 
 
@@ -85,28 +79,14 @@ export const VisitIdSchema = z.object({
 // 🎮 Controllers
 // ==========================================
 
-// ✅ Get All Visits (Filtered by Sales ID)
+// ✅ Get All Visits
 export const getAllVisits = async (req: Request, res: Response) => {  
-    // نقوم بجلب القيمة وإجبارها أن تكون string عن طريق الـ Type Casting
-    const sales_id = req.query.sales_id as string; 
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
+    const querySalesId = req.query.sales_id as string;
 
-    // التحقق من أن المستخدم أرسل الـ sales_id بالفعل وليست فارغة
-    if (!sales_id) {
-        throw new BadRequest("sales_id query parameter is required.");
-    }
-
-    // التحقق من أن الـ sales_id موجود بالفعل في قاعدة البيانات قبل جلب زياراته
-    const salesExist = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.id, sales_id))
-        .limit(1);
-
-    if (!salesExist[0]) {
-        throw new BadRequest("The provided sales_id does not exist.");
-    }
-
-    const allVisitsRaw = await db
+    // 1. بناء الاستعلام بشكل ديناميكي
+    let baseQuery = db
         .select({
             id: visits.id, 
             lat: visits.lat,
@@ -122,9 +102,51 @@ export const getAllVisits = async (req: Request, res: Response) => {
             sales_phone: users.phone,
         })
         .from(visits)
-        .where(eq(visits.sales_id, sales_id)) // لن يظهر الخطأ هنا الآن بعد الـ casting لـ string
         .leftJoin(users, eq(visits.sales_id, users.id))
-        .leftJoin(visitStatus, eq(visits.status_id, visitStatus.id)); 
+        .leftJoin(visitStatus, eq(visits.status_id, visitStatus.id))
+        .$dynamic();
+
+    let whereConditions: any[] = [];
+
+    // 2. تطبيق الصلاحيات والفلترة الذكية لـ Drizzle
+    if (userRole === "admin") {
+        if (querySalesId) {
+            whereConditions.push(eq(visits.sales_id, querySalesId));
+        }
+    } else if (userRole === "leader") {
+        // إذا كان قائد فريق، نجلب معرفات كل السيلز التابعين له
+        const teamSales = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(and(eq(users.leader_id, userId!), eq(users.role, "sales")));
+        
+        const salesIds = teamSales.map(s => s.id);
+
+        if (querySalesId) {
+            if (salesIds.includes(querySalesId)) {
+                whereConditions.push(eq(visits.sales_id, querySalesId));
+            } else {
+                // إذا حاول القائد الاستعلام عن مندوب ليس في فريقه
+                throw new BadRequest("You do not have access to this sales member's visits.");
+            }
+        } else {
+            if (salesIds.length > 0) {
+                whereConditions.push(inArray(visits.sales_id, salesIds));
+            } else {
+                return SuccessResponse(res, { allVisits: [] }, 200);
+            }
+        }
+    } else if (userRole === "sales") {
+        whereConditions.push(eq(visits.sales_id, userId!));
+    } else {
+        throw new BadRequest("Unauthorized role");
+    }
+
+    if (whereConditions.length > 0) {
+        baseQuery = baseQuery.where(and(...whereConditions));
+    }
+
+    const allVisitsRaw = await baseQuery;
 
     // إضافة رابط الخريطة تلقائياً لكل زيارة
     const allVisits = allVisitsRaw.map((visit) => ({
@@ -174,7 +196,11 @@ export const getVisitsById = async (req: Request, res: Response) => {
         throw new NotFound("Visit not found");
     }
 
-    // إرفاق رابط الخريطة للزيارة المستهدفة
+    // التحقق من الصلاحيات للوصول لزيارة معينة
+    if (req.user?.role === "sales" && visitRaw[0].sales_id !== req.user.id) {
+        throw new BadRequest("You do not have permission to access this visit.");
+    }
+
     const visit = {
         ...visitRaw[0],
         map_link: `https://www.google.com/maps/search/?api=1&query=${visitRaw[0].lat},${visitRaw[0].lng}`
@@ -185,30 +211,37 @@ export const getVisitsById = async (req: Request, res: Response) => {
 
 // ✅ Create Visits
 export const createVisits = async (req: Request, res: Response) => {
-    const validated = await createVisitSchema.parseAsync({ body: req.body });
-    const { lat, lng, name, address, notes, phone, status, status_id, sales_id } = validated.body;
+    const validated = await createVisitSchema(req.user?.role).parseAsync({ body: req.body });
+    const { lat, lng, name, address, notes, phone, status, status_id } = validated.body;
     
-    // 🔍 التحقق من صحة وجود الـ sales_id في جدول المستخدمين (users)
+    let sales_id = "";
+    if (req.user?.role === "leader" || req.user?.role === "sales") {
+        sales_id = req.user?.id!;
+    } else {
+        sales_id = validated.body.sales_id!;
+    }
+
+    // 🔍 التحقق من صحة وجود الـ sales_id في جدول المستخدمين
     const salesExist = await db
         .select({ id: users.id })
         .from(users)
-        .where(eq(users.id, sales_id))
+        .where(and(eq(users.id, sales_id), eq(users.role, "sales")))
         .limit(1);
 
     if (!salesExist[0]) {
-        throw new BadRequest("The assigned sales_id does not exist.");
+        throw new BadRequest("The assigned sales_id does not exist or user is not a sales member.");
     }
 
-    // 🔍 التحقق من صحة وجود الـ status_id في جدول الحالات (visitStatus) إن أُرسل
+    // 🔍 التحقق من صحة وجود الـ status_id في جدول الحالات إن أُرسل
     if (status_id) {
         const statusExist = await db
             .select({ id: visitStatus.id })
             .from(visitStatus)
-            .where(eq(visitStatus.id, status_id))
+            .where(and(eq(visitStatus.id, status_id), eq(visitStatus.status, true)))
             .limit(1);
 
         if (!statusExist[0]) {
-            throw new BadRequest("The assigned status_id does not exist.");
+            throw new BadRequest("The assigned status_id does not exist or is inactive.");
         }
     }
 
@@ -234,25 +267,36 @@ export const updateVisits = async (req: Request, res: Response) => {
         body: req.body 
     });
     const { id } = validated.params;
-    const { lat, lng, name, address, notes, phone, status, status_id, sales_id } = validated.body;
+    const { lat, lng, name, address, notes, phone, status, status_id } = validated.body;
   
     // 🔍 1. التأكد من وجود الزيارة الأصلية
-    const existingVisits = await db
+    const existingVisit = await db
         .select()
         .from(visits)
         .where(eq(visits.id, id))
         .limit(1);
 
-    if (!existingVisits[0]) {
+    if (!existingVisit[0]) {
         throw new NotFound("Visit not found");
     }
 
-    // 🔍 2. إذا تم طلب تحديث الـ sales_id، نتأكد أنه مستخدم حقيقي وموجود
+    // تحديد الـ sales_id للتحقق منه أو إدخاله
+    let sales_id = req.body.sales_id;
+    if (req.user?.role === "leader" || req.user?.role === "sales") {
+        sales_id = req.user?.id!;
+        
+        // منع الـ Sales من تعديل زيارة لا تخصه
+        if (existingVisit[0].sales_id !== sales_id) {
+            throw new BadRequest("You do not have permission to modify this visit.");
+        }
+    }
+
+    // 🔍 2. التحقق من وجود الـ sales_id الجديد إذا تم تعديله
     if (sales_id !== undefined && sales_id !== null) {
         const salesExist = await db
             .select({ id: users.id })
             .from(users)
-            .where(eq(users.id, sales_id))
+            .where(and(eq(users.id, sales_id), eq(users.role, "sales")))
             .limit(1);
 
         if (!salesExist[0]) {
@@ -260,12 +304,12 @@ export const updateVisits = async (req: Request, res: Response) => {
         }
     }
 
-    // 🔍 3. إذا تم طلب تحديث الـ status_id، نتأكد أنه حالة حقيقية وموجودة
+    // 🔍 3. التحقق من وجود الـ status_id الجديد إذا تم تعديله
     if (status_id !== undefined && status_id !== null) {
         const statusExist = await db
             .select({ id: visitStatus.id })
             .from(visitStatus)
-            .where(eq(visitStatus.id, status_id))
+            .where(and(eq(visitStatus.id, status_id), eq(visitStatus.status, true)))
             .limit(1);
 
         if (!statusExist[0]) {
@@ -285,8 +329,14 @@ export const updateVisits = async (req: Request, res: Response) => {
     if (status_id !== undefined) updateData.status_id = status_id;
     if (sales_id !== undefined) updateData.sales_id = sales_id;
 
-    await db.update(visits).set(updateData).where(eq(visits.id, id));
+    // دمج الشروط في كائن استعلام واحد بشكل صحيح وسليم
+    let updateConditions = eq(visits.id, id);
+    if (req.user?.role === "leader" || req.user?.role === "sales") {
+        updateConditions = and(eq(visits.id, id), eq(visits.sales_id, req.user.id)) as any;
+    }
 
+    await db.update(visits).set(updateData).where(updateConditions);
+    
     SuccessResponse(res, { message: "Visit updated successfully" }, 200);
 };
 
@@ -294,18 +344,24 @@ export const updateVisits = async (req: Request, res: Response) => {
 export const deleteVisits = async (req: Request, res: Response) => {
     const validated = await VisitIdSchema.parseAsync({ params: req.params });
     const { id } = validated.params; 
-
-    const existingVisits = await db
+  
+    const existingVisit = await db
         .select()
         .from(visits)
         .where(eq(visits.id, id))
         .limit(1);
 
-    if (!existingVisits[0]) {
+    if (!existingVisit[0]) {
         throw new NotFound("Visit not found");
     }
- 
-    await db.delete(visits).where(eq(visits.id, id));
+
+    // بناء شروط الحذف الآمن في استعلام موحد لمنع تكرار دالة .where() الخاطئ
+    let deleteConditions = eq(visits.id, id);
+    if (req.user?.role === "leader" || req.user?.role === "sales") {
+        deleteConditions = and(eq(visits.id, id), eq(visits.sales_id, req.user.id)) as any;
+    }
+
+    const deleteResult = await db.delete(visits).where(deleteConditions);
 
     SuccessResponse(res, { message: "Visit deleted successfully" }, 200);
 };
