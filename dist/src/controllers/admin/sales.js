@@ -7,7 +7,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteSales = exports.updateSales = exports.createSales = exports.getSalesById = exports.lists = exports.getAllSales = exports.salesIdSchema = exports.updateSalesSchema = exports.getCreateSalesSchema = void 0;
 const db_1 = require("../../models/db");
 const schema_1 = require("../../models/schema");
-const drizzle_orm_1 = require("drizzle-orm");
 const response_1 = require("../../utils/response");
 const NotFound_1 = require("../../Errors/NotFound");
 const BadRequest_1 = require("../../Errors/BadRequest");
@@ -15,6 +14,7 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 const handleImages_1 = require("../../utils/handleImages");
 const deleteImage_1 = require("../../utils/deleteImage");
 const zod_1 = require("zod");
+const drizzle_orm_1 = require("drizzle-orm");
 // ==========================================
 // 🛡️ Zod Validation Schemas
 // ==========================================
@@ -73,10 +73,33 @@ exports.salesIdSchema = zod_1.z.object({
 // 🎮 Controllers
 // ==========================================
 // ✅ Get All Sales (للـ Organization الحالية مع الـ Targets الخاصة بهم)
+// ✅ Get All Sales (للـ Organization الحالية مع الـ Targets الخاصة بهم)
 const getAllSales = async (req, res) => {
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
+    // استقبال معايير الـ Pagination والبحث
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || '';
+    const offset = (page - 1) * limit;
     // جلب قائد الفريق الآخر بربط ذاتي (Self Join) لعرض بيانات الـ Leader
     const leaderAlias = db_1.db.$with("leaderAlias").as(db_1.db.select().from(schema_1.users));
-    // 1. نبني الاستعلام الأساسي دون تنفيذ (بشكل مرن)
+    let whereConditions = [];
+    // 1. تطبيق الصلاحيات والفلترة الذكية بناءً على الـ Role
+    if (userRole === "leader") {
+        // إذا كان الفاعل قائد فريق، نُظهر له فقط الـ Sales التابعين له
+        whereConditions.push((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.role, "sales"), (0, drizzle_orm_1.eq)(schema_1.users.leader_id, userId)));
+    }
+    else {
+        // للأدمن أو الأونر نُظهر جميع الـ Sales
+        whereConditions.push((0, drizzle_orm_1.eq)(schema_1.users.role, "sales"));
+    }
+    // 2. تطبيق البحث (Search) بالاسم، الهاتف، أو البريد الإلكتروني للـ Sales
+    if (search) {
+        const searchPattern = `%${search}%`;
+        whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.ilike)(schema_1.users.name, searchPattern), (0, drizzle_orm_1.ilike)(schema_1.users.phone, searchPattern), (0, drizzle_orm_1.ilike)(schema_1.users.email, searchPattern)));
+    }
+    // 3. بناء استعلام البيانات الأساسي (Base Query)
     let query = db_1.db
         .with(leaderAlias)
         .select({
@@ -90,23 +113,38 @@ const getAllSales = async (req, res) => {
         leader_name: leaderAlias.name,
         leader_phone: leaderAlias.phone,
         status: schema_1.users.status,
+        createdAt: schema_1.users.createdAt
     })
         .from(schema_1.users)
         .leftJoin(schema_1.targets, (0, drizzle_orm_1.eq)(schema_1.users.target_id, schema_1.targets.id))
         .leftJoin(leaderAlias, (0, drizzle_orm_1.eq)(schema_1.users.leader_id, leaderAlias.id))
-        .$dynamic(); // تفعيل الوضع الديناميكي لـ Drizzle لتركيب شروط لاحقاً
-    // 2. فحص الـ Role وتطبيق الفلترة المناسبة قبل التنفيذ
-    if (req.user?.role === "leader") {
-        // إذا كان الفاعل قائد فريق، نُظهر له فقط الـ Sales التابعين له
-        query = query.where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.role, "sales"), (0, drizzle_orm_1.eq)(schema_1.users.leader_id, req.user.id)));
+        .orderBy((0, drizzle_orm_1.desc)(schema_1.users.createdAt)) // ترتيب الأحدث أولاً
+        .$dynamic();
+    // 4. بناء استعلام الـ Count لحساب العدد الإجمالي متوافقاً مع فلاتر البحث والصلاحيات
+    let countQuery = db_1.db
+        .select({ total: (0, drizzle_orm_1.count)() })
+        .from(schema_1.users)
+        .$dynamic();
+    // ربط الشروط بالاستعلامات
+    if (whereConditions.length > 0) {
+        query = query.where((0, drizzle_orm_1.and)(...whereConditions));
+        countQuery = countQuery.where((0, drizzle_orm_1.and)(...whereConditions));
     }
-    else {
-        // للأدمن أو الأونر نُظهر جميع الـ Sales
-        query = query.where((0, drizzle_orm_1.eq)(schema_1.users.role, "sales"));
-    }
-    // 3. تنفيذ الاستعلام النهائي وجلب البيانات
-    const allusers = await query;
-    (0, response_1.SuccessResponse)(res, { sales: allusers }, 200);
+    // 5. تنفيذ الاستعلامين بالتوازي (Parallel Execution) لضمان أعلى أداء
+    const [allSales, [{ total: totalCount }]] = await Promise.all([
+        query.limit(limit).offset(offset),
+        countQuery
+    ]);
+    // 6. إرسال النتيجة مع بيانات الـ Pagination كاملة
+    (0, response_1.SuccessResponse)(res, {
+        sales: allSales,
+        pagination: {
+            total: totalCount,
+            page,
+            limit,
+            totalPages: Math.ceil(totalCount / limit)
+        }
+    }, 200);
 };
 exports.getAllSales = getAllSales;
 // ✅ Get Targets List (لإستخدامها في القائمة المنسدلة مثلاً)

@@ -8,6 +8,7 @@ const drizzle_orm_1 = require("drizzle-orm");
 const response_1 = require("../../utils/response");
 const NotFound_1 = require("../../Errors/NotFound");
 const zod_1 = require("zod");
+const drizzle_orm_2 = require("drizzle-orm");
 // ==========================================
 // 🛡️ Zod Validation Schemas
 // ==========================================
@@ -41,15 +42,53 @@ exports.WishListIdSchema = zod_1.z.object({
 // ==========================================
 // ✅ Get All WishLists
 const getAllWishLists = async (req, res) => {
-    // ⚠️ تم إضافة await هنا لحل مشكلة عدم جلب البيانات الفعلي من قاعدة البيانات
-    const allWishLists = await db_1.db
+    // استقبال معايير الـ Pagination والبحث
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || '';
+    const offset = (page - 1) * limit;
+    let whereConditions = [];
+    // 1. تطبيق البحث (Search) باسم قائمة الأمنيات أو وصفها
+    if (search) {
+        const searchPattern = `%${search}%`;
+        whereConditions.push((0, drizzle_orm_2.or)((0, drizzle_orm_2.ilike)(schema_1.wishList.name, searchPattern), (0, drizzle_orm_2.ilike)(schema_1.wishList.description, searchPattern)));
+    }
+    // 2. بناء استعلام البيانات الأساسي (Base Query)
+    let query = db_1.db
         .select({
         id: schema_1.wishList.id,
         name: schema_1.wishList.name,
         description: schema_1.wishList.description,
+        createdAt: schema_1.wishList.createdAt // تأكد من وجود هذا الحقل في الموديل للترتيب، أو استبدله بـ wishList.id
     })
-        .from(schema_1.wishList);
-    (0, response_1.SuccessResponse)(res, { allWishLists }, 200);
+        .from(schema_1.wishList)
+        .orderBy((0, drizzle_orm_2.desc)(schema_1.wishList.createdAt)) // ترتيب الأحدث أولاً
+        .$dynamic();
+    // 3. بناء استعلام الـ Count لحساب العدد الإجمالي متوافقاً مع فلاتر البحث
+    let countQuery = db_1.db
+        .select({ total: (0, drizzle_orm_2.count)() })
+        .from(schema_1.wishList)
+        .$dynamic();
+    // ربط الشروط بالاستعلامات
+    if (whereConditions.length > 0) {
+        query = query.where((0, drizzle_orm_2.and)(...whereConditions));
+        countQuery = countQuery.where((0, drizzle_orm_2.and)(...whereConditions));
+    }
+    // 4. تنفيذ الاستعلامين بالتوازي (Parallel Execution) لسرعة استجابة فائقة
+    const [allWishLists, [{ total: totalCount }]] = await Promise.all([
+        query.limit(limit).offset(offset),
+        countQuery
+    ]);
+    // 5. إرسال النتيجة مع معلومات الـ Pagination الكاملة
+    (0, response_1.SuccessResponse)(res, {
+        allWishLists,
+        pagination: {
+            total: totalCount,
+            page,
+            limit,
+            totalPages: Math.ceil(totalCount / limit)
+        }
+    }, 200);
 };
 exports.getAllWishLists = getAllWishLists;
 // ✅ Get WishLists By ID

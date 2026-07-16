@@ -64,7 +64,21 @@ exports.adminIdSchema = zod_1.z.object({
 // ==========================================
 // ✅ Get All Admins
 const getAllAdmin = async (req, res) => {
-    const allusers = await db_1.db
+    // استقبال معايير الـ Pagination والبحث
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || '';
+    const offset = (page - 1) * limit;
+    let whereConditions = [];
+    // 1. الفلترة الأساسية: جلب المستخدمين الذين يمتلكون دور "admin" فقط
+    whereConditions.push((0, drizzle_orm_1.eq)(schema_1.users.role, "admin"));
+    // 2. تطبيق البحث (Search) بالاسم، الهاتف، أو البريد الإلكتروني للمشرفين
+    if (search) {
+        const searchPattern = `%${search}%`;
+        whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.ilike)(schema_1.users.name, searchPattern), (0, drizzle_orm_1.ilike)(schema_1.users.phone, searchPattern), (0, drizzle_orm_1.ilike)(schema_1.users.email, searchPattern)));
+    }
+    // 3. بناء استعلام البيانات الأساسي (Base Query)
+    let query = db_1.db
         .select({
         id: schema_1.users.id,
         name: schema_1.users.name,
@@ -72,10 +86,36 @@ const getAllAdmin = async (req, res) => {
         phone: schema_1.users.phone,
         image: schema_1.users.image,
         status: schema_1.users.status,
+        createdAt: schema_1.users.createdAt
     })
         .from(schema_1.users)
-        .where((0, drizzle_orm_1.eq)(schema_1.users.role, "admin"));
-    (0, response_1.SuccessResponse)(res, { admins: allusers }, 200);
+        .orderBy((0, drizzle_orm_1.desc)(schema_1.users.createdAt)) // ترتيب الأحدث أولاً
+        .$dynamic();
+    // 4. بناء استعلام الـ Count لحساب العدد الإجمالي متوافقاً مع فلاتر البحث
+    let countQuery = db_1.db
+        .select({ total: (0, drizzle_orm_1.count)() })
+        .from(schema_1.users)
+        .$dynamic();
+    // ربط الشروط بالاستعلامات
+    if (whereConditions.length > 0) {
+        query = query.where((0, drizzle_orm_1.and)(...whereConditions));
+        countQuery = countQuery.where((0, drizzle_orm_1.and)(...whereConditions));
+    }
+    // 5. تنفيذ الاستعلامين بالتوازي (Parallel Execution) لتقليل زمن الاستجابة لأقل حد ممكن
+    const [allAdmins, [{ total: totalCount }]] = await Promise.all([
+        query.limit(limit).offset(offset),
+        countQuery
+    ]);
+    // 6. إرسال النتيجة مع معلومات الـ Pagination الكاملة
+    (0, response_1.SuccessResponse)(res, {
+        admins: allAdmins,
+        pagination: {
+            total: totalCount,
+            page,
+            limit,
+            totalPages: Math.ceil(totalCount / limit)
+        }
+    }, 200);
 };
 exports.getAllAdmin = getAllAdmin;
 // ✅ Get Admin By ID

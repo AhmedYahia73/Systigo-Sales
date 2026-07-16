@@ -66,7 +66,21 @@ exports.leaderIdSchema = zod_1.z.object({
 // ==========================================
 // ✅ Get All Leaders
 const getAllLeader = async (req, res) => {
-    const allusers = await db_1.db
+    // استقبال معايير الـ Pagination والبحث
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || '';
+    const offset = (page - 1) * limit;
+    let whereConditions = [];
+    // 1. الفلترة الأساسية: جلب المستخدمين الذين يمتلكون دور "leader" فقط
+    whereConditions.push((0, drizzle_orm_1.eq)(schema_1.users.role, "leader"));
+    // 2. تطبيق البحث (Search) بالاسم، الهاتف، أو البريد الإلكتروني للقادة
+    if (search) {
+        const searchPattern = `%${search}%`;
+        whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.ilike)(schema_1.users.name, searchPattern), (0, drizzle_orm_1.ilike)(schema_1.users.phone, searchPattern), (0, drizzle_orm_1.ilike)(schema_1.users.email, searchPattern)));
+    }
+    // 3. بناء استعلام البيانات الأساسي (Base Query)
+    let query = db_1.db
         .select({
         id: schema_1.users.id,
         name: schema_1.users.name,
@@ -76,11 +90,37 @@ const getAllLeader = async (req, res) => {
         target: schema_1.targets.name,
         target_number: schema_1.targets.number,
         status: schema_1.users.status,
+        createdAt: schema_1.users.createdAt
     })
         .from(schema_1.users)
         .leftJoin(schema_1.targets, (0, drizzle_orm_1.eq)(schema_1.users.target_id, schema_1.targets.id))
-        .where((0, drizzle_orm_1.eq)(schema_1.users.role, "leader"));
-    (0, response_1.SuccessResponse)(res, { leaders: allusers }, 200);
+        .orderBy((0, drizzle_orm_1.desc)(schema_1.users.createdAt)) // ترتيب الأحدث أولاً
+        .$dynamic();
+    // 4. بناء استعلام الـ Count لحساب العدد الإجمالي متوافقاً مع فلاتر البحث
+    let countQuery = db_1.db
+        .select({ total: (0, drizzle_orm_1.count)() })
+        .from(schema_1.users)
+        .$dynamic();
+    // ربط الشروط بالاستعلامات
+    if (whereConditions.length > 0) {
+        query = query.where((0, drizzle_orm_1.and)(...whereConditions));
+        countQuery = countQuery.where((0, drizzle_orm_1.and)(...whereConditions));
+    }
+    // 5. تنفيذ الاستعلامين بالتوازي (Parallel Execution) لتقليل زمن الاستجابة
+    const [allLeaders, [{ total: totalCount }]] = await Promise.all([
+        query.limit(limit).offset(offset),
+        countQuery
+    ]);
+    // 6. إرسال النتيجة مع معلومات الـ Pagination الكاملة
+    (0, response_1.SuccessResponse)(res, {
+        leaders: allLeaders,
+        pagination: {
+            total: totalCount,
+            page,
+            limit,
+            totalPages: Math.ceil(totalCount / limit)
+        }
+    }, 200);
 };
 exports.getAllLeader = getAllLeader;
 // ✅ Get Targets List (لإستخدامها في القائمة المنسدلة)

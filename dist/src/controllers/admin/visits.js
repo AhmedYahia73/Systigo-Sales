@@ -3,11 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteVisits = exports.updateVisits = exports.createVisits = exports.getVisitsById = exports.lists = exports.getAllVisits = exports.VisitIdSchema = exports.updateVisitSchema = exports.createVisitSchema = void 0;
 const db_1 = require("../../models/db");
 const schema_1 = require("../../models/schema");
-const drizzle_orm_1 = require("drizzle-orm");
 const response_1 = require("../../utils/response");
 const NotFound_1 = require("../../Errors/NotFound");
 const BadRequest_1 = require("../../Errors/BadRequest");
 const zod_1 = require("zod");
+const drizzle_orm_1 = require("drizzle-orm");
 // ==========================================
 // 🛡️ Zod Validation Schemas
 // ==========================================
@@ -68,12 +68,80 @@ exports.VisitIdSchema = zod_1.z.object({
 // ==========================================
 // 🎮 Controllers
 // ==========================================
-// ✅ Get All Visits
+// ✅ Get All Visitsexport 
 const getAllVisits = async (req, res) => {
     const userRole = req.user?.role;
     const userId = req.user?.id;
     const querySalesId = req.query.sales_id;
-    // 1. بناء الاستعلام بشكل ديناميكي
+    // استقبال معايير الـ Pagination والبحث
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || '';
+    // استقبال معايير فلترة التاريخ (صيغة المتوقع: YYYY-MM-DD)
+    const fromDateStr = req.query.from; // مثلاً: 2026-05-05
+    const toDateStr = req.query.to; // مثلاً: 2026-05-05
+    const offset = (page - 1) * limit;
+    let whereConditions = [];
+    // 1. تطبيق الصلاحيات والفلترة الذكية لـ Drizzle
+    if (userRole === "admin") {
+        if (querySalesId) {
+            whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, querySalesId));
+        }
+    }
+    else if (userRole === "leader") {
+        const teamSales = await db_1.db
+            .select({ id: schema_1.users.id })
+            .from(schema_1.users)
+            .where((0, drizzle_orm_1.or)((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.leader_id, userId), (0, drizzle_orm_1.eq)(schema_1.users.role, "sales")), (0, drizzle_orm_1.eq)(schema_1.users.id, userId)));
+        const salesIds = teamSales.map(s => s.id);
+        if (querySalesId) {
+            if (salesIds.includes(querySalesId)) {
+                whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, querySalesId));
+            }
+            else {
+                throw new BadRequest_1.BadRequest("You do not have access to this sales member's visits.");
+            }
+        }
+        else {
+            if (salesIds.length > 0) {
+                whereConditions.push((0, drizzle_orm_1.inArray)(schema_1.visits.sales_id, salesIds));
+            }
+            else {
+                return (0, response_1.SuccessResponse)(res, { allVisits: [], pagination: { total: 0, page, limit, totalPages: 0 } }, 200);
+            }
+        }
+    }
+    else if (userRole === "sales") {
+        whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, userId));
+    }
+    else {
+        throw new BadRequest_1.BadRequest("Unauthorized role");
+    }
+    // 2. تطبيق البحث (Search) بناءً على الاسم، الإيميل، أو الهاتف
+    if (search) {
+        const searchPattern = `%${search}%`;
+        whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.ilike)(schema_1.visits.name, searchPattern), // اسم العميل/الزيارة
+        (0, drizzle_orm_1.ilike)(schema_1.visits.phone, searchPattern), // هاتف العميل/الزيارة
+        (0, drizzle_orm_1.ilike)(schema_1.users.name, searchPattern), // اسم المندوب
+        (0, drizzle_orm_1.ilike)(schema_1.users.email, searchPattern), // إيميل المندوب
+        (0, drizzle_orm_1.ilike)(schema_1.users.phone, searchPattern) // هاتف المندوب
+        ));
+    }
+    // 3. تطبيق الفلترة بالتاريخ بدون وقت (Date-only filter)
+    // نستخدم الكائنات الافتراضية للوقت للتأكد من جلب اليوم كاملاً (من 00:00:00 إلى 23:59:59)
+    if (fromDateStr) {
+        const fromDate = new Date(`${fromDateStr}T00:00:00.000Z`);
+        if (!isNaN(fromDate.getTime())) {
+            whereConditions.push((0, drizzle_orm_1.gte)(schema_1.visits.createdAt, fromDate));
+        }
+    }
+    if (toDateStr) {
+        const toDate = new Date(`${toDateStr}T23:59:59.999Z`);
+        if (!isNaN(toDate.getTime())) {
+            whereConditions.push((0, drizzle_orm_1.lte)(schema_1.visits.createdAt, toDate));
+        }
+    }
+    // 4. بناء الاستعلام الأساسي (Base Query)
     let baseQuery = db_1.db
         .select({
         id: schema_1.visits.id,
@@ -88,59 +156,45 @@ const getAllVisits = async (req, res) => {
         status_id: schema_1.visits.status_id,
         sales: schema_1.users.name,
         sales_phone: schema_1.users.phone,
+        createdAt: schema_1.visits.createdAt
     })
         .from(schema_1.visits)
         .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.visits.sales_id, schema_1.users.id))
         .leftJoin(schema_1.visitStatus, (0, drizzle_orm_1.eq)(schema_1.visits.status_id, schema_1.visitStatus.id))
+        .orderBy((0, drizzle_orm_1.desc)(schema_1.visits.createdAt))
         .$dynamic();
-    let whereConditions = [];
-    // 2. تطبيق الصلاحيات والفلترة الذكية لـ Drizzle
-    if (userRole === "admin") {
-        if (querySalesId) {
-            whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, querySalesId));
-        }
-    }
-    else if (userRole === "leader") {
-        // إذا كان قائد فريق، نجلب معرفات كل السيلز التابعين له
-        const teamSales = await db_1.db
-            .select({ id: schema_1.users.id })
-            .from(schema_1.users)
-            .where((0, drizzle_orm_1.or)((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.leader_id, userId), (0, drizzle_orm_1.eq)(schema_1.users.role, "sales")), (0, drizzle_orm_1.eq)(schema_1.users.id, userId)));
-        const salesIds = teamSales.map(s => s.id);
-        if (querySalesId) {
-            if (salesIds.includes(querySalesId)) {
-                whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, querySalesId));
-            }
-            else {
-                // إذا حاول القائد الاستعلام عن مندوب ليس في فريقه
-                throw new BadRequest_1.BadRequest("You do not have access to this sales member's visits.");
-            }
-        }
-        else {
-            if (salesIds.length > 0) {
-                whereConditions.push((0, drizzle_orm_1.inArray)(schema_1.visits.sales_id, salesIds));
-            }
-            else {
-                return (0, response_1.SuccessResponse)(res, { allVisits: [] }, 200);
-            }
-        }
-    }
-    else if (userRole === "sales") {
-        whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, userId));
-    }
-    else {
-        throw new BadRequest_1.BadRequest("Unauthorized role");
-    }
+    // 5. استعلام لحساب العدد الإجمالي متوافق مع الفلاتر (Count Query)
+    let countQuery = db_1.db
+        .select({ total: (0, drizzle_orm_1.count)() })
+        .from(schema_1.visits)
+        .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.visits.sales_id, schema_1.users.id))
+        .leftJoin(schema_1.visitStatus, (0, drizzle_orm_1.eq)(schema_1.visits.status_id, schema_1.visitStatus.id))
+        .$dynamic();
+    // ربط الشروط بالاستعلامات
     if (whereConditions.length > 0) {
         baseQuery = baseQuery.where((0, drizzle_orm_1.and)(...whereConditions));
+        countQuery = countQuery.where((0, drizzle_orm_1.and)(...whereConditions));
     }
-    const allVisitsRaw = await baseQuery;
+    // تنفيذ الاستعلامين معاً بالتوازي لتحسين الأداء
+    const [allVisitsRaw, [{ total: totalCount }]] = await Promise.all([
+        baseQuery.limit(limit).offset(offset),
+        countQuery
+    ]);
     // إضافة رابط الخريطة تلقائياً لكل زيارة
     const allVisits = allVisitsRaw.map((visit) => ({
         ...visit,
         map_link: `https://www.google.com/maps/search/?api=1&query=${visit.lat},${visit.lng}`
     }));
-    (0, response_1.SuccessResponse)(res, { allVisits }, 200);
+    // إرسال النتيجة مع معلومات الـ pagination الكاملة
+    (0, response_1.SuccessResponse)(res, {
+        allVisits,
+        pagination: {
+            total: totalCount,
+            page,
+            limit,
+            totalPages: Math.ceil(totalCount / limit)
+        }
+    }, 200);
 };
 exports.getAllVisits = getAllVisits;
 // ✅ Get Active Visit Statuses
