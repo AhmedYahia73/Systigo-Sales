@@ -1,12 +1,11 @@
 import { Request, Response } from "express";
 import { db } from "../../models/db";
-import { users, visits, visitStatus } from "../../models/schema";
-import { eq, and, or, inArray } from "drizzle-orm";
+import { users, visits, visitStatus } from "../../models/schema"; 
 import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound";
 import { BadRequest } from "../../Errors/BadRequest";
 import { z } from "zod";
-
+import { SQL, and, or, eq, ilike, inArray, count, gte, lte, desc } from 'drizzle-orm';
 // ==========================================
 // 🛡️ Zod Validation Schemas
 // ==========================================
@@ -79,13 +78,93 @@ export const VisitIdSchema = z.object({
 // 🎮 Controllers
 // ==========================================
 
-// ✅ Get All Visits
+// ✅ Get All Visitsexport 
 export const getAllVisits = async (req: Request, res: Response) => {  
     const userRole = req.user?.role;
     const userId = req.user?.id;
     const querySalesId = req.query.sales_id as string;
 
-    // 1. بناء الاستعلام بشكل ديناميكي
+    // استقبال معايير الـ Pagination والبحث
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const search = (req.query.search as string) || '';
+    
+    // استقبال معايير فلترة التاريخ (صيغة المتوقع: YYYY-MM-DD)
+    const fromDateStr = req.query.from as string; // مثلاً: 2026-05-05
+    const toDateStr = req.query.to as string;     // مثلاً: 2026-05-05
+
+    const offset = (page - 1) * limit;
+
+    let whereConditions: SQL[] = [];
+
+    // 1. تطبيق الصلاحيات والفلترة الذكية لـ Drizzle
+    if (userRole === "admin") {
+        if (querySalesId) {
+            whereConditions.push(eq(visits.sales_id, querySalesId));
+        }
+    } else if (userRole === "leader") {
+        const teamSales = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(
+                or(
+                    and(eq(users.leader_id, userId!), eq(users.role, "sales")), 
+                    eq(users.id, userId!)
+                )
+            );
+        
+        const salesIds = teamSales.map(s => s.id);
+
+        if (querySalesId) {
+            if (salesIds.includes(querySalesId)) {
+                whereConditions.push(eq(visits.sales_id, querySalesId));
+            } else {
+                throw new BadRequest("You do not have access to this sales member's visits.");
+            }
+        } else {
+            if (salesIds.length > 0) {
+                whereConditions.push(inArray(visits.sales_id, salesIds));
+            } else {
+                return SuccessResponse(res, { allVisits: [], pagination: { total: 0, page, limit, totalPages: 0 } }, 200);
+            }
+        }
+    } else if (userRole === "sales") {
+        whereConditions.push(eq(visits.sales_id, userId!));
+    } else {
+        throw new BadRequest("Unauthorized role");
+    }
+
+    // 2. تطبيق البحث (Search) بناءً على الاسم، الإيميل، أو الهاتف
+    if (search) {
+        const searchPattern = `%${search}%`;
+        whereConditions.push(
+            or(
+                ilike(visits.name, searchPattern),         // اسم العميل/الزيارة
+                ilike(visits.phone, searchPattern),        // هاتف العميل/الزيارة
+                ilike(users.name, searchPattern),          // اسم المندوب
+                ilike(users.email, searchPattern),         // إيميل المندوب
+                ilike(users.phone, searchPattern)          // هاتف المندوب
+            ) as SQL
+        );
+    }
+
+    // 3. تطبيق الفلترة بالتاريخ بدون وقت (Date-only filter)
+    // نستخدم الكائنات الافتراضية للوقت للتأكد من جلب اليوم كاملاً (من 00:00:00 إلى 23:59:59)
+    if (fromDateStr) {
+        const fromDate = new Date(`${fromDateStr}T00:00:00.000Z`);
+        if (!isNaN(fromDate.getTime())) {
+            whereConditions.push(gte(visits.createdAt, fromDate));
+        }
+    }
+
+    if (toDateStr) {
+        const toDate = new Date(`${toDateStr}T23:59:59.999Z`);
+        if (!isNaN(toDate.getTime())) {
+            whereConditions.push(lte(visits.createdAt, toDate));
+        }
+    }
+
+    // 4. بناء الاستعلام الأساسي (Base Query)
     let baseQuery = db
         .select({
             id: visits.id, 
@@ -100,62 +179,50 @@ export const getAllVisits = async (req: Request, res: Response) => {
             status_id: visits.status_id,
             sales: users.name,
             sales_phone: users.phone,
+            createdAt: visits.createdAt
         })
+        .from(visits)
+        .leftJoin(users, eq(visits.sales_id, users.id))
+        .leftJoin(visitStatus, eq(visits.status_id, visitStatus.id))
+        .orderBy(desc(visits.createdAt))
+        .$dynamic();
+
+    // 5. استعلام لحساب العدد الإجمالي متوافق مع الفلاتر (Count Query)
+    let countQuery = db
+        .select({ total: count() })
         .from(visits)
         .leftJoin(users, eq(visits.sales_id, users.id))
         .leftJoin(visitStatus, eq(visits.status_id, visitStatus.id))
         .$dynamic();
 
-    let whereConditions: any[] = [];
-
-    // 2. تطبيق الصلاحيات والفلترة الذكية لـ Drizzle
-    if (userRole === "admin") {
-        if (querySalesId) {
-            whereConditions.push(eq(visits.sales_id, querySalesId));
-        }
-    } else if (userRole === "leader") {
-        // إذا كان قائد فريق، نجلب معرفات كل السيلز التابعين له
-        const teamSales = await db
-            .select({ id: users.id })
-            .from(users)
-            .where(or(and(eq(users.leader_id, userId!), eq(users.role, "sales")), 
-            eq(users.id, userId!)));
-        
-        const salesIds = teamSales.map(s => s.id);
-
-        if (querySalesId) {
-            if (salesIds.includes(querySalesId)) {
-                whereConditions.push(eq(visits.sales_id, querySalesId));
-            } else {
-                // إذا حاول القائد الاستعلام عن مندوب ليس في فريقه
-                throw new BadRequest("You do not have access to this sales member's visits.");
-            }
-        } else {
-            if (salesIds.length > 0) {
-                whereConditions.push(inArray(visits.sales_id, salesIds));
-            } else {
-                return SuccessResponse(res, { allVisits: [] }, 200);
-            }
-        }
-    } else if (userRole === "sales") {
-        whereConditions.push(eq(visits.sales_id, userId!));
-    } else {
-        throw new BadRequest("Unauthorized role");
-    }
-
+    // ربط الشروط بالاستعلامات
     if (whereConditions.length > 0) {
         baseQuery = baseQuery.where(and(...whereConditions));
+        countQuery = countQuery.where(and(...whereConditions));
     }
 
-    const allVisitsRaw = await baseQuery;
+    // تنفيذ الاستعلامين معاً بالتوازي لتحسين الأداء
+    const [allVisitsRaw, [{ total: totalCount }]] = await Promise.all([
+        baseQuery.limit(limit).offset(offset),
+        countQuery
+    ]);
 
     // إضافة رابط الخريطة تلقائياً لكل زيارة
     const allVisits = allVisitsRaw.map((visit) => ({
         ...visit,
         map_link: `https://www.google.com/maps/search/?api=1&query=${visit.lat},${visit.lng}`
     }));
- 
-    SuccessResponse(res, { allVisits }, 200);
+
+    // إرسال النتيجة مع معلومات الـ pagination الكاملة
+    SuccessResponse(res, { 
+        allVisits,
+        pagination: {
+            total: totalCount,
+            page,
+            limit,
+            totalPages: Math.ceil(totalCount / limit)
+        }
+    }, 200);
 };
 
 // ✅ Get Active Visit Statuses

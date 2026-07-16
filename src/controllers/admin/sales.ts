@@ -3,7 +3,6 @@
 import { Request, Response } from "express";
 import { db } from "../../models/db";
 import { targets, users } from "../../models/schema";
-import { eq, and, ne, or } from "drizzle-orm";
 import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound";
 import { BadRequest } from "../../Errors/BadRequest";
@@ -11,7 +10,7 @@ import bcrypt from "bcrypt";
 import { saveBase64Image } from "../../utils/handleImages";
 import { deletePhotoFromServer } from "../../utils/deleteImage";
 import { z } from "zod";
-
+import { SQL, and, or, eq, ilike, count, desc, ne} from 'drizzle-orm';
 // ==========================================
 // 🛡️ Zod Validation Schemas
 // ==========================================
@@ -82,13 +81,53 @@ export const salesIdSchema = z.object({
 // ==========================================
 
 // ✅ Get All Sales (للـ Organization الحالية مع الـ Targets الخاصة بهم)
+
+// ✅ Get All Sales (للـ Organization الحالية مع الـ Targets الخاصة بهم)
 export const getAllSales = async (req: Request, res: Response) => {
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
+
+    // استقبال معايير الـ Pagination والبحث
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const search = (req.query.search as string) || '';
+    
+    const offset = (page - 1) * limit;
+
     // جلب قائد الفريق الآخر بربط ذاتي (Self Join) لعرض بيانات الـ Leader
     const leaderAlias = db.$with("leaderAlias").as(
         db.select().from(users)
     );
 
-    // 1. نبني الاستعلام الأساسي دون تنفيذ (بشكل مرن)
+    let whereConditions: SQL[] = [];
+
+    // 1. تطبيق الصلاحيات والفلترة الذكية بناءً على الـ Role
+    if (userRole === "leader") {
+        // إذا كان الفاعل قائد فريق، نُظهر له فقط الـ Sales التابعين له
+        whereConditions.push(
+            and(
+                eq(users.role, "sales"), 
+                eq(users.leader_id, userId!)
+            ) as SQL
+        );
+    } else {
+        // للأدمن أو الأونر نُظهر جميع الـ Sales
+        whereConditions.push(eq(users.role, "sales"));
+    }
+
+    // 2. تطبيق البحث (Search) بالاسم، الهاتف، أو البريد الإلكتروني للـ Sales
+    if (search) {
+        const searchPattern = `%${search}%`;
+        whereConditions.push(
+            or(
+                ilike(users.name, searchPattern),
+                ilike(users.phone, searchPattern),
+                ilike(users.email, searchPattern)
+            ) as SQL
+        );
+    }
+
+    // 3. بناء استعلام البيانات الأساسي (Base Query)
     let query = db
         .with(leaderAlias)
         .select({
@@ -102,25 +141,42 @@ export const getAllSales = async (req: Request, res: Response) => {
             leader_name: leaderAlias.name,
             leader_phone: leaderAlias.phone,
             status: users.status, 
+            createdAt: users.createdAt
         })
         .from(users)
         .leftJoin(targets, eq(users.target_id, targets.id))
         .leftJoin(leaderAlias, eq(users.leader_id, leaderAlias.id))
-        .$dynamic(); // تفعيل الوضع الديناميكي لـ Drizzle لتركيب شروط لاحقاً
+        .orderBy(desc(users.createdAt)) // ترتيب الأحدث أولاً
+        .$dynamic();
 
-    // 2. فحص الـ Role وتطبيق الفلترة المناسبة قبل التنفيذ
-    if (req.user?.role === "leader") {
-        // إذا كان الفاعل قائد فريق، نُظهر له فقط الـ Sales التابعين له
-        query = query.where(and(eq(users.role, "sales"), eq(users.leader_id, req.user.id)));
-    } else {
-        // للأدمن أو الأونر نُظهر جميع الـ Sales
-        query = query.where(eq(users.role, "sales"));
+    // 4. بناء استعلام الـ Count لحساب العدد الإجمالي متوافقاً مع فلاتر البحث والصلاحيات
+    let countQuery = db
+        .select({ total: count() })
+        .from(users)
+        .$dynamic();
+
+    // ربط الشروط بالاستعلامات
+    if (whereConditions.length > 0) {
+        query = query.where(and(...whereConditions));
+        countQuery = countQuery.where(and(...whereConditions));
     }
 
-    // 3. تنفيذ الاستعلام النهائي وجلب البيانات
-    const allusers = await query;
+    // 5. تنفيذ الاستعلامين بالتوازي (Parallel Execution) لضمان أعلى أداء
+    const [allSales, [{ total: totalCount }]] = await Promise.all([
+        query.limit(limit).offset(offset),
+        countQuery
+    ]);
 
-    SuccessResponse(res, { sales: allusers }, 200);
+    // 6. إرسال النتيجة مع بيانات الـ Pagination كاملة
+    SuccessResponse(res, { 
+        sales: allSales,
+        pagination: {
+            total: totalCount,
+            page,
+            limit,
+            totalPages: Math.ceil(totalCount / limit)
+        }
+    }, 200);
 };
 
 // ✅ Get Targets List (لإستخدامها في القائمة المنسدلة مثلاً)
