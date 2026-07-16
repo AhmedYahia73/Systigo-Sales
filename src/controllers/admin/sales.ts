@@ -16,37 +16,41 @@ import { z } from "zod";
 // 🛡️ Zod Validation Schemas
 // ==========================================
 
-// الـ Schema الخاص بإنشاء مستخدم Sales جديد
-export const createSalesSchema = z.object({
-  body: z.object({
-    name: z.string({ required_error: "Name is required" })
-      .min(1, "Name cannot be empty")
-      .max(200, "Name cannot exceed 200 characters"),
-    
-    email: z.string({ required_error: "Email is required" })
-      .email("Invalid email format")
-      .max(100, "Email cannot exceed 100 characters"),
-    
-    phone: z.string({ required_error: "Phone is required" })
-      .min(5, "Phone is too short")
-      .max(20, "Phone cannot exceed 20 characters"),
-    
-    password: z.string({ required_error: "Password is required" })
-      .min(6, "Password must be at least 6 characters"),
-    
-    image: z.string().nullable().optional(),
-    
-    leader_id: z.string({ required_error: "Leader ID is required" })
-      .uuid("Invalid leader ID format"),
-    
-    target_id: z.string().uuid("Invalid target ID format").nullable().optional(),
+// الـ Schema الخاص بإنشاء مستخدم Sales (ديناميكي بناءً على الـ Role)
+export const getCreateSalesSchema = (userRole?: string) => {
+  return z.object({
+    body: z.object({
+      name: z.string({ required_error: "Name is required" })
+        .min(1, "Name cannot be empty")
+        .max(200, "Name cannot exceed 200 characters"),
+      
+      email: z.string({ required_error: "Email is required" })
+        .email("Invalid email format")
+        .max(100, "Email cannot exceed 100 characters"),
+      
+      phone: z.string({ required_error: "Phone is required" })
+        .min(5, "Phone is too short")
+        .max(20, "Phone cannot exceed 20 characters"),
+      
+      password: z.string({ required_error: "Password is required" })
+        .min(6, "Password must be at least 6 characters"),
+      
+      image: z.string().nullable().optional(),
+      
+      // إذا كان الـ role هو leader، نجعل الحقل اختياري لأننا سنأخذه تلقائياً من الـ Token
+      leader_id: userRole === "leader" 
+        ? z.string().uuid("Invalid leader ID format").optional()
+        : z.string({ required_error: "Leader ID is required" }).uuid("Invalid leader ID format"),
+      
+      target_id: z.string().uuid("Invalid target ID format").nullable().optional(),
 
-    status: z.enum(["active", "inactive"], {
-      required_error: "Status is required",
-      invalid_type_error: "Status must be either 'active' or 'inactive'",
+      status: z.enum(["active", "inactive"], {
+        required_error: "Status is required",
+        invalid_type_error: "Status must be either 'active' or 'inactive'",
+      }),
     }),
-  }),
-});
+  });
+};
 
 // الـ Schema الخاص بتحديث مستخدم Sales
 export const updateSalesSchema = z.object({
@@ -84,7 +88,8 @@ export const getAllSales = async (req: Request, res: Response) => {
         db.select().from(users)
     );
 
-    const allusers = await db
+    // 1. نبني الاستعلام الأساسي دون تنفيذ (بشكل مرن)
+    let query = db
         .with(leaderAlias)
         .select({
             id: users.id,
@@ -101,7 +106,19 @@ export const getAllSales = async (req: Request, res: Response) => {
         .from(users)
         .leftJoin(targets, eq(users.target_id, targets.id))
         .leftJoin(leaderAlias, eq(users.leader_id, leaderAlias.id))
-        .where(eq(users.role, "sales"));
+        .$dynamic(); // تفعيل الوضع الديناميكي لـ Drizzle لتركيب شروط لاحقاً
+
+    // 2. فحص الـ Role وتطبيق الفلترة المناسبة قبل التنفيذ
+    if (req.user?.role === "leader") {
+        // إذا كان الفاعل قائد فريق، نُظهر له فقط الـ Sales التابعين له
+        query = query.where(and(eq(users.role, "sales"), eq(users.leader_id, req.user.id)));
+    } else {
+        // للأدمن أو الأونر نُظهر جميع الـ Sales
+        query = query.where(eq(users.role, "sales"));
+    }
+
+    // 3. تنفيذ الاستعلام النهائي وجلب البيانات
+    const allusers = await query;
 
     SuccessResponse(res, { sales: allusers }, 200);
 };
@@ -155,10 +172,24 @@ export const getSalesById = async (req: Request, res: Response) => {
 
 // ✅ Create Sales
 export const createSales = async (req: Request, res: Response) => {
-    const validated = await createSalesSchema.parseAsync({ body: req.body });
-    const { name, email, password, phone, image, target_id, leader_id, status } = validated.body;
+    // 1. التحقق من البيانات عبر الـ Schema الديناميكية
+    const validated = await getCreateSalesSchema(req.user?.role).parseAsync({ body: req.body });
+    const { name, email, password, phone, image, target_id, status } = validated.body;
     
-    // 1. تحقق من وجود الـ Leader وصحة الـ Role الخاص به
+    // 2. تحديد الـ leader_id بناءً على الـ Role لمنع التلاعب بالبيانات
+    let leader_id: string | undefined;
+
+    if (req.user?.role === "leader") {
+        leader_id = req.user.id; // يتم إجبار استخدام الـ ID الخاص به
+    } else {
+        leader_id = validated.body.leader_id; // يتم أخذه من المدخلات المفحوصة للأدمن أو الأونر
+    }
+
+    if (!leader_id) {
+        throw new BadRequest("Leader ID is required for this operation");
+    }
+
+    // 3. تحقق من وجود الـ Leader وصحة الـ Role الخاص به
     const targetLeader = await db
         .select()
         .from(users)
@@ -169,7 +200,7 @@ export const createSales = async (req: Request, res: Response) => {
         throw new BadRequest("The assigned leader was not found or is invalid");
     }
 
-    // 2. تحقق من عدم تكرار البريد الإلكتروني أو الهاتف لحساب آخر
+    // 4. تحقق من عدم تكرار البريد الإلكتروني أو الهاتف لحساب آخر
     const existingSales = await db
         .select()
         .from(users)
@@ -180,7 +211,7 @@ export const createSales = async (req: Request, res: Response) => {
         throw new BadRequest("Email or Phone already exists");
     } 
 
-    // تشفير كلمة المرور
+    // 5. تشفير كلمة المرور
     const hashedPassword = await bcrypt.hash(password, 10);
 
     let savedSalesImage: string | null = null; 
@@ -190,6 +221,7 @@ export const createSales = async (req: Request, res: Response) => {
         savedSalesImage = result.url;
     }
 
+    // 6. إدخال البيانات في قاعدة البيانات
     await db.insert(users).values({
         name,
         email,
@@ -212,9 +244,9 @@ export const updateSales = async (req: Request, res: Response) => {
         body: req.body 
     });
     const { id } = validated.params;
-    const { name, email, password, phone, image, target_id, leader_id, status } = validated.body;
+    const { name, email, password, phone, image, target_id, status } = validated.body;
   
-    // 1. تحقق من وجود الـ Sales نفسه وصحة الـ Role
+    // 1. التحقق من وجود الـ Sales نفسه وصحة الـ Role
     const existingSales = await db
         .select()
         .from(users)
@@ -225,7 +257,16 @@ export const updateSales = async (req: Request, res: Response) => {
         throw new NotFound("Sales not found");
     }
 
-    // 2. تحقق من صحة الـ Leader الجديد إذا تم إرساله
+    // 2. حماية وتأمين الـ leader_id عند التحديث
+    let leader_id: string | undefined;
+
+    if (req.user?.role === "leader") {
+        leader_id = req.user.id; // القائد لا يمكنه تعديل القائد التابع له السيلز
+    } else {
+        leader_id = validated.body.leader_id; // للأونر أو الأدمن يمكنهم تعديله إذا تم إرساله
+    } 
+
+    // 3. تحقق من صحة الـ Leader الجديد إذا تم تعديله أو إرساله
     if (leader_id) {
         const targetLeader = await db
             .select()
@@ -238,7 +279,7 @@ export const updateSales = async (req: Request, res: Response) => {
         }
     }
 
-    // 3. تحقق من البريد الإلكتروني المكرر
+    // 4. تحقق من البريد الإلكتروني المكرر لغير هذا الحساب
     if (email && email !== existingSales[0].email) {
         const duplicateEmail = await db
             .select()
@@ -251,7 +292,7 @@ export const updateSales = async (req: Request, res: Response) => {
         }
     } 
 
-    // 4. تحقق من الهاتف المكرر
+    // 5. تحقق من الهاتف المكرر لغير هذا الحساب
     if (phone && phone !== existingSales[0].phone) {
         const duplicatePhone = await db
             .select()
@@ -264,6 +305,7 @@ export const updateSales = async (req: Request, res: Response) => {
         }
     }
 
+    // 6. معالجة الصور والتعديلات عليها
     let salesImage = existingSales[0].image;
 
     if (image !== undefined) {
@@ -281,6 +323,7 @@ export const updateSales = async (req: Request, res: Response) => {
         }
     }
 
+    // 7. بناء كائن التعديل لتجنب إرسال undefined لقاعدة البيانات
     const updateData: any = {};
     if (name !== undefined) updateData.name = name;
     if (email !== undefined) updateData.email = email;

@@ -10,11 +10,11 @@ import wishListSeeder from "./data/05_default_wishlist";
 
 // Export all seeds in execution order
 export const seeds: Seed[] = [ 
-  visitsSeeder,
   targetsSeeder,
-  statusSeeder,
-  wishListSeeder,
   adminSeeder, 
+  statusSeeder,
+  visitsSeeder,
+  wishListSeeder,
 ];
 
 // Run seeds when this file is executed directly

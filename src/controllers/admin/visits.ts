@@ -43,8 +43,8 @@ export const createVisitSchema = z.object({
       invalid_type_error: "Status must be either 'visit', 'sales', or 'delivered'",
     }).optional(),
 
-    status_id: z.string().uuid("Invalid status ID format").nullable().optional(),
-    sales_id: z.string({ required_error: "Sales ID is required" }).uuid("Invalid sales ID format"),
+    status_id: z.string().nullable().optional(),
+    sales_id: z.string({ required_error: "Sales ID is required" }),
   }),
 });
 
@@ -68,8 +68,8 @@ export const updateVisitSchema = z.object({
     notes: z.string().max(1000).nullable().optional(),
     phone: z.string().min(5).max(20).optional(),
     status: z.enum(["visit", "sales", "delivered"]).optional(),
-    status_id: z.string().uuid("Invalid status ID format").nullable().optional(),
-    sales_id: z.string().uuid("Invalid sales ID format").nullable().optional(),
+    status_id: z.string().nullable().optional(),
+    sales_id: z.string().nullable().optional(),
   }),
 });
 
@@ -86,9 +86,14 @@ export const VisitIdSchema = z.object({
 // ==========================================
 
 // ✅ Get All Visits (Filtered by Sales ID)
-export const getAllVisits = async (req: Request, res: Response) => { 
-    const validated = await SalesVisitSchema.parseAsync({ body: req.body });
-    const { sales_id } = validated.body;
+export const getAllVisits = async (req: Request, res: Response) => {  
+    // نقوم بجلب القيمة وإجبارها أن تكون string عن طريق الـ Type Casting
+    const sales_id = req.query.sales_id as string; 
+
+    // التحقق من أن المستخدم أرسل الـ sales_id بالفعل وليست فارغة
+    if (!sales_id) {
+        throw new BadRequest("sales_id query parameter is required.");
+    }
 
     // التحقق من أن الـ sales_id موجود بالفعل في قاعدة البيانات قبل جلب زياراته
     const salesExist = await db
@@ -117,7 +122,7 @@ export const getAllVisits = async (req: Request, res: Response) => {
             sales_phone: users.phone,
         })
         .from(visits)
-        .where(eq(visits.sales_id, sales_id))
+        .where(eq(visits.sales_id, sales_id)) // لن يظهر الخطأ هنا الآن بعد الـ casting لـ string
         .leftJoin(users, eq(visits.sales_id, users.id))
         .leftJoin(visitStatus, eq(visits.status_id, visitStatus.id)); 
 
@@ -128,7 +133,7 @@ export const getAllVisits = async (req: Request, res: Response) => {
     }));
  
     SuccessResponse(res, { allVisits }, 200);
-}; 
+};
 
 // ✅ Get Active Visit Statuses
 export const lists = async (req: Request, res: Response) => { 

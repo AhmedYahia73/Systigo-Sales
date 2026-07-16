@@ -9,7 +9,7 @@ import {
 } from "../../controllers/admin/sales";
 import { catchAsync } from "../../utils/catchAsync";
 import { validate } from "../../middlewares/validation";
-import { checkAdminLeader } from "../../middlewares/checkpermission";
+import { checkAdminLeader, checkOnlyAdmin } from "../../middlewares/checkpermission";
 
 const router = Router();
 
@@ -292,7 +292,7 @@ router.post("/", checkAdminLeader(), catchAsync(createSales));
  *       401:
  *         description: Unauthorized
  */
-router.put("/:id", checkAdminLeader(), catchAsync(updateSales));
+router.put("/:id", checkOnlyAdmin(), catchAsync(updateSales));
 
 /**
  * @swagger
@@ -326,6 +326,6 @@ router.put("/:id", checkAdminLeader(), catchAsync(updateSales));
  *       401:
  *         description: Unauthorized
  */
-router.delete("/:id", checkAdminLeader(), catchAsync(deleteSales));
+router.delete("/:id", checkOnlyAdmin(), catchAsync(deleteSales));
 
 export default router;

@@ -13,11 +13,11 @@ const _04_default_visit_status_1 = __importDefault(require("./data/04_default_vi
 const _05_default_wishlist_1 = __importDefault(require("./data/05_default_wishlist"));
 // Export all seeds in execution order
 exports.seeds = [
-    _03_default_visits_1.default,
     _02_default_targets_1.default,
-    _04_default_visit_status_1.default,
-    _05_default_wishlist_1.default,
     _01_admin_1.default,
+    _04_default_visit_status_1.default,
+    _03_default_visits_1.default,
+    _05_default_wishlist_1.default,
 ];
 // Run seeds when this file is executed directly
 const runner_1 = require("./runner");

@@ -36,8 +36,8 @@ exports.createVisitSchema = zod_1.z.object({
         status: zod_1.z.enum(["visit", "sales", "delivered"], {
             invalid_type_error: "Status must be either 'visit', 'sales', or 'delivered'",
         }).optional(),
-        status_id: zod_1.z.string().uuid("Invalid status ID format").nullable().optional(),
-        sales_id: zod_1.z.string({ required_error: "Sales ID is required" }).uuid("Invalid sales ID format"),
+        status_id: zod_1.z.string().nullable().optional(),
+        sales_id: zod_1.z.string({ required_error: "Sales ID is required" }),
     }),
 });
 // الـ Schema الخاص بالتحقق من الـ sales_id عند جلب كل الزيارات التابعة له
@@ -59,8 +59,8 @@ exports.updateVisitSchema = zod_1.z.object({
         notes: zod_1.z.string().max(1000).nullable().optional(),
         phone: zod_1.z.string().min(5).max(20).optional(),
         status: zod_1.z.enum(["visit", "sales", "delivered"]).optional(),
-        status_id: zod_1.z.string().uuid("Invalid status ID format").nullable().optional(),
-        sales_id: zod_1.z.string().uuid("Invalid sales ID format").nullable().optional(),
+        status_id: zod_1.z.string().nullable().optional(),
+        sales_id: zod_1.z.string().nullable().optional(),
     }),
 });
 // الـ Schema الخاص بالعمليات التي تتطلب ID فقط
@@ -74,8 +74,12 @@ exports.VisitIdSchema = zod_1.z.object({
 // ==========================================
 // ✅ Get All Visits (Filtered by Sales ID)
 const getAllVisits = async (req, res) => {
-    const validated = await exports.SalesVisitSchema.parseAsync({ body: req.body });
-    const { sales_id } = validated.body;
+    // نقوم بجلب القيمة وإجبارها أن تكون string عن طريق الـ Type Casting
+    const sales_id = req.query.sales_id;
+    // التحقق من أن المستخدم أرسل الـ sales_id بالفعل وليست فارغة
+    if (!sales_id) {
+        throw new BadRequest_1.BadRequest("sales_id query parameter is required.");
+    }
     // التحقق من أن الـ sales_id موجود بالفعل في قاعدة البيانات قبل جلب زياراته
     const salesExist = await db_1.db
         .select({ id: schema_1.users.id })
@@ -101,7 +105,7 @@ const getAllVisits = async (req, res) => {
         sales_phone: schema_1.users.phone,
     })
         .from(schema_1.visits)
-        .where((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, sales_id))
+        .where((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, sales_id)) // لن يظهر الخطأ هنا الآن بعد الـ casting لـ string
         .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.visits.sales_id, schema_1.users.id))
         .leftJoin(schema_1.visitStatus, (0, drizzle_orm_1.eq)(schema_1.visits.status_id, schema_1.visitStatus.id));
     // إضافة رابط الخريطة تلقائياً لكل زيارة
