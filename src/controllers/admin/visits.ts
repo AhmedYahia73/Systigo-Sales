@@ -45,14 +45,14 @@ export const createVisitSchema = (userRole?: string) => {
             status_id: z.string().nullable().optional(),
             sales_id: userRole === "sales" || userRole === "leader"
                 ? z.string().uuid().optional()
-                : z.string({ required_error: "Sales ID is required" }).uuid("Invalid sales ID format"),
+                : z.string({ required_error: "Sales ID is required" }),
         }),
     }); 
 };
 
 export const updateVisitSchema = z.object({
     params: z.object({
-        id: z.string({ required_error: "ID is required in parameters" }).uuid("Invalid ID format"),
+        id: z.string({ required_error: "ID is required in parameters" }),
     }),
     body: z.object({ 
         lat: z.number().min(-90).max(90).optional(),
@@ -63,13 +63,13 @@ export const updateVisitSchema = z.object({
         phone: z.string().min(5).max(20).optional(),
         status: z.enum(["visit", "sales", "delivered"]).optional(),
         status_id: z.string().nullable().optional(),
-        sales_id: z.string().uuid("Invalid sales ID format").nullable().optional(),
+        sales_id: z.string().nullable().optional(),
     }),
 });
 
 export const VisitIdSchema = z.object({
     params: z.object({
-        id: z.string({ required_error: "ID is required in parameters" }).uuid("Invalid ID format"),
+        id: z.string({ required_error: "ID is required in parameters" }),
     }),
 }); 
 
