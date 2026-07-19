@@ -42,7 +42,7 @@ export const createVisitSchema = (userRole?: string) => {
                 invalid_type_error: "Status must be either 'visit', 'sales', or 'delivered'",
             }).optional(),
 
-            status_id: z.string().uuid("Invalid status ID format").nullable().optional(),
+            status_id: z.string().nullable().optional(),
             sales_id: userRole === "sales" || userRole === "leader"
                 ? z.string().uuid().optional()
                 : z.string({ required_error: "Sales ID is required" }).uuid("Invalid sales ID format"),
@@ -62,7 +62,7 @@ export const updateVisitSchema = z.object({
         notes: z.string().max(1000).nullable().optional(),
         phone: z.string().min(5).max(20).optional(),
         status: z.enum(["visit", "sales", "delivered"]).optional(),
-        status_id: z.string().uuid("Invalid status ID format").nullable().optional(),
+        status_id: z.string().nullable().optional(),
         sales_id: z.string().uuid("Invalid sales ID format").nullable().optional(),
     }),
 });
