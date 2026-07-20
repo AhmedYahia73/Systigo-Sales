@@ -14,7 +14,7 @@ const options: swaggerJSDoc.Options = {
     },
     servers: [
       {
-        url: "https://sales.systego.net", 
+        url: "https://salesbcknd.systego.net", 
         description: "Development Server",
       },
     ],
@@ -42,5 +42,5 @@ const swaggerSpec = swaggerJSDoc(options);
 export const setupSwagger = (app: Express) => {
   // رابط عرض واجهة Swagger
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-  console.log("📝 Swagger documentation is available at https://sales.systego.net/api-docs");
+  console.log("📝 Swagger documentation is available at https://salesbcknd.systego.net/api-docs");
 };
