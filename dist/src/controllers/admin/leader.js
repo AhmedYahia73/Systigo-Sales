@@ -88,7 +88,6 @@ const getAllLeader = async (req, res) => {
         phone: schema_1.users.phone,
         image: schema_1.users.image,
         target: schema_1.targets.name,
-        target_number: schema_1.targets.number,
         status: schema_1.users.status,
         createdAt: schema_1.users.createdAt
     })

@@ -109,7 +109,7 @@ const getAllSales = async (req, res) => {
         phone: schema_1.users.phone,
         image: schema_1.users.image,
         target: schema_1.targets.name,
-        target_number: schema_1.targets.number,
+        target_name: schema_1.targets.name,
         leader_name: leaderAlias.name,
         leader_phone: leaderAlias.phone,
         status: schema_1.users.status,

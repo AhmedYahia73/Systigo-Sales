@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.login = login;
+exports.hash_password = hash_password;
 const db_1 = require("../../models/db");
 const schema_1 = require("../../models/schema");
 const drizzle_orm_1 = require("drizzle-orm");
@@ -52,5 +53,12 @@ async function login(req, res) {
             phone: admin[0].phone,
             role: admin[0].role,
         },
+    }, 200);
+}
+async function hash_password(req, res) {
+    const { password } = req.body;
+    // 6) الرد
+    return (0, response_1.SuccessResponse)(res, {
+        password: await bcrypt_1.default.hash(password, 10),
     }, 200);
 }

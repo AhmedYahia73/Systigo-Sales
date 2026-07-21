@@ -17,7 +17,7 @@ const options = {
         },
         servers: [
             {
-                url: "http://localhost:3000",
+                url: "https://salesbcknd.systego.net",
                 description: "Development Server",
             },
         ],
@@ -43,6 +43,6 @@ const swaggerSpec = (0, swagger_jsdoc_1.default)(options);
 const setupSwagger = (app) => {
     // رابط عرض واجهة Swagger
     app.use("/api-docs", swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup(swaggerSpec));
-    console.log("📝 Swagger documentation is available at http://localhost:3000/api-docs");
+    console.log("📝 Swagger documentation is available at https://salesbcknd.systego.net/api-docs");
 };
 exports.setupSwagger = setupSwagger;

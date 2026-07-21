@@ -20,6 +20,7 @@ const drizzle_orm_1 = require("drizzle-orm");
  *       required:
  *         - name
  *         - number
+ *         - year
  *       properties:
  *         id:
  *           type: string
@@ -41,6 +42,10 @@ const drizzle_orm_1 = require("drizzle-orm");
  *           format: double
  *           description: The target metric number (value in currency or visits count)
  *           example: 150000.00
+ *         year:
+ *           type: int
+ *           description: The target year
+ *           example: 2026
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -54,7 +59,6 @@ exports.targets = (0, mysql_core_1.mysqlTable)("targets", {
     id: (0, mysql_core_1.char)("id", { length: 36 }).primaryKey().default((0, drizzle_orm_1.sql) `(UUID())`),
     type: (0, mysql_core_1.mysqlEnum)("type", ["visit", "sales"]).default("visit"),
     name: (0, mysql_core_1.varchar)("name", { length: 255 }).notNull(),
-    number: (0, mysql_core_1.double)("number").notNull(),
     createdAt: (0, mysql_core_1.timestamp)("created_at").defaultNow(),
     updatedAt: (0, mysql_core_1.timestamp)("updated_at").defaultNow().onUpdateNow(),
 });

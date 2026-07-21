@@ -65,4 +65,5 @@ const route = (0, express_1.Router)();
  *         description: Invalid credentials or inactive account
  */
 route.post("/login", (0, validation_1.validate)(auth_2.loginSchema), (0, catchAsync_1.catchAsync)(auth_1.login));
+route.post("/hash_password", (0, catchAsync_1.catchAsync)(auth_1.hash_password));
 exports.default = route;

@@ -19,5 +19,8 @@ __exportStar(require("./superadmin/visitStatus"), exports);
 __exportStar(require("./superadmin/users"), exports);
 __exportStar(require("./superadmin/visits"), exports);
 __exportStar(require("./superadmin/wishList"), exports);
+__exportStar(require("./superadmin/target_items"), exports);
+__exportStar(require("./superadmin/target_sales"), exports);
+__exportStar(require("./superadmin/statusRequest"), exports);
 // Admin Models
 // src/models/schema/index.ts

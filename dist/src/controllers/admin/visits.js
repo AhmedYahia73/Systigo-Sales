@@ -36,17 +36,17 @@ const createVisitSchema = (userRole) => {
             status: zod_1.z.enum(["visit", "sales", "delivered"], {
                 invalid_type_error: "Status must be either 'visit', 'sales', or 'delivered'",
             }).optional(),
-            status_id: zod_1.z.string().uuid("Invalid status ID format").nullable().optional(),
+            status_id: zod_1.z.string().nullable().optional(),
             sales_id: userRole === "sales" || userRole === "leader"
                 ? zod_1.z.string().uuid().optional()
-                : zod_1.z.string({ required_error: "Sales ID is required" }).uuid("Invalid sales ID format"),
+                : zod_1.z.string({ required_error: "Sales ID is required" }),
         }),
     });
 };
 exports.createVisitSchema = createVisitSchema;
 exports.updateVisitSchema = zod_1.z.object({
     params: zod_1.z.object({
-        id: zod_1.z.string({ required_error: "ID is required in parameters" }).uuid("Invalid ID format"),
+        id: zod_1.z.string({ required_error: "ID is required in parameters" }),
     }),
     body: zod_1.z.object({
         lat: zod_1.z.number().min(-90).max(90).optional(),
@@ -56,13 +56,13 @@ exports.updateVisitSchema = zod_1.z.object({
         notes: zod_1.z.string().max(1000).nullable().optional(),
         phone: zod_1.z.string().min(5).max(20).optional(),
         status: zod_1.z.enum(["visit", "sales", "delivered"]).optional(),
-        status_id: zod_1.z.string().uuid("Invalid status ID format").nullable().optional(),
-        sales_id: zod_1.z.string().uuid("Invalid sales ID format").nullable().optional(),
+        status_id: zod_1.z.string().nullable().optional(),
+        sales_id: zod_1.z.string().nullable().optional(),
     }),
 });
 exports.VisitIdSchema = zod_1.z.object({
     params: zod_1.z.object({
-        id: zod_1.z.string({ required_error: "ID is required in parameters" }).uuid("Invalid ID format"),
+        id: zod_1.z.string({ required_error: "ID is required in parameters" }),
     }),
 });
 // ==========================================
@@ -246,24 +246,39 @@ exports.getVisitsById = getVisitsById;
 // ✅ Create Visits
 const createVisits = async (req, res) => {
     const validated = await (0, exports.createVisitSchema)(req.user?.role).parseAsync({ body: req.body });
-    const { lat, lng, name, address, notes, phone, status, status_id } = validated.body;
-    let sales_id = "";
-    if (req.user?.role === "leader" || req.user?.role === "sales") {
-        sales_id = req.user?.id;
+    const { lat, lng, name, address, notes, phone, status_id } = validated.body;
+    // 1. تحديد قيمة الـ status بشكل آمن حسب الدور
+    let status = "visit";
+    if ((req.user?.role === "leader" || req.user?.role === "admin") && req.body.status) {
+        status = req.body.status;
+    }
+    // 2. تحديد الـ sales_id المخصص للزيارة
+    let sales_id;
+    if (req.user?.role === "sales") {
+        // موظف المبيعات تسند له الزيارة تلقائياً
+        sales_id = req.user.id;
+    }
+    else if (req.user?.role === "leader") {
+        // القائد يمكنه إسنادها لموظف مبيعات أو لنفسه إذا لم يحدد sales_id
+        sales_id = validated.body.sales_id || req.user.id;
     }
     else {
+        // الأدوار الأخرى (مثل Admin) يجب أن توفر sales_id في الـ body
         sales_id = validated.body.sales_id;
     }
-    // 🔍 التحقق من صحة وجود الـ sales_id في جدول المستخدمين
+    if (!sales_id) {
+        throw new BadRequest_1.BadRequest("sales_id is required.");
+    }
+    // 🔍 3. التحقق من صحة وجود الـ sales_id في جدول المستخدمين
     const salesExist = await db_1.db
         .select({ id: schema_1.users.id })
         .from(schema_1.users)
         .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.id, sales_id), (0, drizzle_orm_1.or)((0, drizzle_orm_1.eq)(schema_1.users.role, "sales"), (0, drizzle_orm_1.eq)(schema_1.users.role, "leader"))))
         .limit(1);
     if (!salesExist[0]) {
-        throw new BadRequest_1.BadRequest("The assigned sales_id does not exist or user is not a sales member.");
+        throw new BadRequest_1.BadRequest("The assigned sales_id does not exist or user is not a sales member/leader.");
     }
-    // 🔍 التحقق من صحة وجود الـ status_id في جدول الحالات إن أُرسل
+    // 🔍 4. التحقق من صحة وجود الـ status_id في جدول الحالات إن أُرسل
     if (status_id) {
         const statusExist = await db_1.db
             .select({ id: schema_1.visitStatus.id })
@@ -274,6 +289,7 @@ const createVisits = async (req, res) => {
             throw new BadRequest_1.BadRequest("The assigned status_id does not exist or is inactive.");
         }
     }
+    // 5. إنشاء الزيارة في قاعدة البيانات
     await db_1.db.insert(schema_1.visits).values({
         lat,
         lng,
@@ -281,7 +297,7 @@ const createVisits = async (req, res) => {
         address,
         notes: notes || null,
         phone,
-        status: status || "visit",
+        status: status,
         status_id: status_id || null,
         sales_id,
     });
@@ -302,19 +318,16 @@ const updateVisits = async (req, res) => {
         .from(schema_1.visits)
         .where((0, drizzle_orm_1.eq)(schema_1.visits.id, id))
         .limit(1);
-    if (!existingVisit[0]) {
+    const currentVisit = existingVisit[0];
+    if (!currentVisit) {
         throw new NotFound_1.NotFound("Visit not found");
     }
-    // تحديد الـ sales_id للتحقق منه أو إدخاله
-    let sales_id = req.body.sales_id;
-    if (req.user?.role === "leader" || req.user?.role === "sales") {
-        sales_id = req.user?.id;
-        // منع الـ Sales من تعديل زيارة لا تخصه
-        if (existingVisit[0].sales_id !== sales_id) {
-            throw new BadRequest_1.BadRequest("You do not have permission to modify this visit.");
-        }
+    // 🔒 منع Sales من تعديل زيارة لا تخصه
+    if (req.user?.role === "sales" && currentVisit.sales_id !== req.user.id) {
+        throw new BadRequest_1.BadRequest("You do not have permission to modify this visit.");
     }
-    // 🔍 2. التحقق من وجود الـ sales_id الجديد إذا تم تعديله
+    let sales_id = req.body.sales_id;
+    // 🔍 2. التحقق من وجود الـ sales_id الجديد إذا تم تعيينه أو تعديله
     if (sales_id !== undefined && sales_id !== null) {
         const salesExist = await db_1.db
             .select({ id: schema_1.users.id })
@@ -350,18 +363,48 @@ const updateVisits = async (req, res) => {
         updateData.notes = notes;
     if (phone !== undefined)
         updateData.phone = phone;
-    if (status !== undefined)
-        updateData.status = status;
     if (status_id !== undefined)
         updateData.status_id = status_id;
-    if (sales_id !== undefined)
+    if (sales_id !== undefined && req.user?.role !== "sales")
         updateData.sales_id = sales_id;
-    // دمج الشروط في كائن استعلام واحد بشكل صحيح وسليم
+    // التعامل مع الـ Status ورتب المستخدمين (Roles)
+    if (status !== undefined) {
+        if (req.user?.role === "sales") {
+            if (!req.user.id) {
+                throw new BadRequest_1.BadRequest("User ID is missing.");
+            }
+            // فحص ما إذا كان هناك طلب معلق لنفس الحالة سلفًا
+            const request_item = await db_1.db
+                .select({ id: schema_1.statusRequest.id })
+                .from(schema_1.statusRequest)
+                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.statusRequest.visitId, currentVisit.id), (0, drizzle_orm_1.eq)(schema_1.statusRequest.from, currentVisit.status), (0, drizzle_orm_1.eq)(schema_1.statusRequest.to, status), (0, drizzle_orm_1.eq)(schema_1.statusRequest.userId, req.user.id), (0, drizzle_orm_1.eq)(schema_1.statusRequest.status, "pending")))
+                .limit(1);
+            if (request_item[0]) {
+                throw new BadRequest_1.BadRequest("A pending status update request already exists for this visit.");
+            }
+            // إنشاء طلب تغيير حالة جديد
+            await db_1.db.insert(schema_1.statusRequest).values({
+                visitId: currentVisit.id,
+                from: currentVisit.status,
+                to: status,
+                userId: req.user.id,
+                status: "pending",
+            });
+        }
+        else {
+            // الأدوار الأخرى (Admin / Leader) -> تغيير مباشر
+            updateData.status = status;
+        }
+    }
+    // شرط التحديث في قاعدة البيانات
     let updateConditions = (0, drizzle_orm_1.eq)(schema_1.visits.id, id);
-    if (req.user?.role === "leader" || req.user?.role === "sales") {
+    if (req.user?.role === "sales") {
         updateConditions = (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.visits.id, id), (0, drizzle_orm_1.eq)(schema_1.visits.sales_id, req.user.id));
     }
-    await db_1.db.update(schema_1.visits).set(updateData).where(updateConditions);
+    // تنفيذ الـ Update فقط إذا كان هناك حقول للتعديل تجنباً لأخطاء SQL Syntax
+    if (Object.keys(updateData).length > 0) {
+        await db_1.db.update(schema_1.visits).set(updateData).where(updateConditions);
+    }
     (0, response_1.SuccessResponse)(res, { message: "Visit updated successfully" }, 200);
 };
 exports.updateVisits = updateVisits;
