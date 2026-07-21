@@ -108,8 +108,7 @@ export const getAllLeader = async (req: Request, res: Response) => {
             email: users.email,
             phone: users.phone,
             image: users.image,
-            target: targets.name,
-            target_number: targets.number,
+            target: targets.name, 
             status: users.status, 
             createdAt: users.createdAt
         })
