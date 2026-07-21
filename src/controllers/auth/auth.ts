@@ -64,4 +64,16 @@ export async function login(req: Request, res: Response) {
     200
   );
 }
+export async function hash_password(req: Request, res: Response) {
+  const { password } = req.body;
+  
+  // 6) الرد
+  return SuccessResponse(
+    res,
+    {
+      password: await bcrypt.hash(password, 10), 
+    },
+    200
+  );
+}
  
