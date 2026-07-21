@@ -6,4 +6,5 @@ const catchAsync_1 = require("../../utils/catchAsync");
 const checkpermission_1 = require("../../middlewares/checkpermission");
 const router = (0, express_1.Router)();
 router.get("/", (0, checkpermission_1.checkAdminLeaderSales)(), (0, catchAsync_1.catchAsync)(dashboard_1.viewDashboard));
+router.post("/", (0, checkpermission_1.checkAdminLeaderSales)(), (0, catchAsync_1.catchAsync)(dashboard_1.viewDashboard));
 exports.default = router;
