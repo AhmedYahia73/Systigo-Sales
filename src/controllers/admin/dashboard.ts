@@ -11,7 +11,7 @@ import { NotFound } from "../../Errors/NotFound";
 // ==========================================
 // 🎮 Controllers
 // ==========================================
-export const view = async (req: Request, res: Response) => { 
+export const viewDashboard = async (req: Request, res: Response) => { 
     const role = req.user?.role;
     const userId = req.user?.id;
 
