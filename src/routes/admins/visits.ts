@@ -6,6 +6,8 @@ import {
     createVisits,
     updateVisits,
     deleteVisits,
+    getAllSales,
+    getVisitsCounts
 } from "../../controllers/admin/visits";
 import { catchAsync } from "../../utils/catchAsync";
 import { checkAdminLeaderSales } from "../../middlewares/checkpermission";
@@ -176,6 +178,8 @@ const router = Router();
  *         description: Forbidden
  */
 router.get("/", checkAdminLeaderSales(), catchAsync(getAllVisits));
+router.get("/sales", checkAdminLeaderSales(), catchAsync(getAllSales));
+router.get("/report", checkAdminLeaderSales(), catchAsync(getVisitsCounts));
 
 /**
  * @swagger
