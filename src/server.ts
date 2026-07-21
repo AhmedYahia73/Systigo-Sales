@@ -51,9 +51,9 @@ app.get("/api/test", (req, res, next) => {
 
 app.use("/api", ApiRoute);
 
-app.use((req, res, next) => {
-  throw new NotFound("Route not found");
-});
+// app.use((req, res, next) => {
+//   throw new NotFound("Route not found");
+// });
 
 app.use(errorHandler);
  
