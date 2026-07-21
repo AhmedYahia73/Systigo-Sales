@@ -234,8 +234,21 @@ export const lists = async (req: Request, res: Response) => {
         })
         .from(visitStatus)
         .where(eq(visitStatus.status, true));  
- 
-    SuccessResponse(res, { visit_status }, 200);
+    const userId = req.user?.id;
+    const sales = await db
+        .select({ 
+            id: users.id,
+            name: users.name,
+            phone: users.phone,
+            })
+        .from(users)
+        .where(
+            or(
+                and(eq(users.leader_id, userId!), eq(users.role, "sales")), 
+                eq(users.id, userId!)
+            )
+        );
+    SuccessResponse(res, { visit_status, sales }, 200);
 }; 
 
 // ✅ Get Visits By ID
