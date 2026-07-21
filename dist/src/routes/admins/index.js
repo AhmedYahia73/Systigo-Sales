@@ -26,5 +26,5 @@ route.use("/target", (0, catchAsync_1.catchAsync)(target_1.default));
 route.use("/admins", (0, catchAsync_1.catchAsync)(admin_1.default));
 route.use("/visits", (0, catchAsync_1.catchAsync)(visits_1.default));
 route.use("/wish_list", (0, catchAsync_1.catchAsync)(wishList_1.default));
-route.use("/dashboard", (0, catchAsync_1.catchAsync)(dashboard_1.default));
+route.use("/dashboard/new", (0, catchAsync_1.catchAsync)(dashboard_1.default));
 exports.default = route;

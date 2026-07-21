@@ -58,7 +58,7 @@ app.use((req, res, next) => {
 app.use(errorHandler);
  
 
-// 🚀 تشغيل الخادم على البورت 3000
-httpServer.listen(3000, () => {
-  console.log("Server is running on http://localhost:3000");
+// 🚀 تشغيل الخادم على البورت 3001
+httpServer.listen(3001, () => {
+  console.log("Server is running on http://localhost:3001");
 });

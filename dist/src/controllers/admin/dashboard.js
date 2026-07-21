@@ -84,14 +84,15 @@ const viewDashboard = async (req, res) => {
     const targetAchievedSales = sales + delivered;
     const targetAchievedVisits = negotiation;
     // 5. حساب التارجت المخصص بناءً على المستخدم والتواريخ
+    // 5. حساب التارجت المخصص بناءً على المستخدم والتواريخ
     const targetWhereConditions = [(0, drizzle_orm_1.eq)(schema_1.target_sales.user_id, userId)];
     if (targetDateConditions.length > 0) {
         targetWhereConditions.push(...targetDateConditions.filter(Boolean));
     }
     const [salesTargetResult] = await db_1.db
         .select({
-        total_visits_target: (0, drizzle_orm_1.sql) `CAST(COALESCE(SUM(CASE WHEN ${schema_1.targets.type} = 'visit' THEN ${schema_1.target_items.number} END), 0) AS UNSIGNED)`,
-        total_sales_target: (0, drizzle_orm_1.sql) `CAST(COALESCE(SUM(CASE WHEN ${schema_1.targets.type} = 'sales' THEN ${schema_1.target_items.number} END), 0) AS UNSIGNED)`,
+        total_visits_target: (0, drizzle_orm_1.sql) `CAST(COALESCE(SUM(CASE WHEN ${schema_1.targets.type} = 'visit' THEN ${schema_1.target_items.number} END), 0) AS UNSIGNED) AS total_visits_target`,
+        total_sales_target: (0, drizzle_orm_1.sql) `CAST(COALESCE(SUM(CASE WHEN ${schema_1.targets.type} = 'sales' THEN ${schema_1.target_items.number} END), 0) AS UNSIGNED) AS total_sales_target`,
     })
         .from(schema_1.target_sales)
         .leftJoin(schema_1.targets, (0, drizzle_orm_1.eq)(schema_1.target_sales.target_id, schema_1.targets.id))

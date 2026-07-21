@@ -108,15 +108,17 @@ export const viewDashboard = async (req: Request, res: Response) => {
     const targetAchievedVisits = negotiation;
 
     // 5. حساب التارجت المخصص بناءً على المستخدم والتواريخ
-    const targetWhereConditions = [eq(target_sales.user_id, userId)];
-  if (targetDateConditions.length > 0) {
-    targetWhereConditions.push(...(targetDateConditions.filter(Boolean) as SQL[]));
-}
+ // 5. حساب التارجت المخصص بناءً على المستخدم والتواريخ
+    const targetWhereConditions: SQL[] = [eq(target_sales.user_id, userId)];
+    
+    if (targetDateConditions.length > 0) {
+        targetWhereConditions.push(...(targetDateConditions.filter(Boolean) as SQL[]));
+    }
 
     const [salesTargetResult] = await db
         .select({
-            total_visits_target: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${targets.type} = 'visit' THEN ${target_items.number} END), 0) AS UNSIGNED)`,
-            total_sales_target: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${targets.type} = 'sales' THEN ${target_items.number} END), 0) AS UNSIGNED)`,
+            total_visits_target: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${targets.type} = 'visit' THEN ${target_items.number} END), 0) AS UNSIGNED) AS total_visits_target`,
+            total_sales_target: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${targets.type} = 'sales' THEN ${target_items.number} END), 0) AS UNSIGNED) AS total_sales_target`,
         })
         .from(target_sales)
         .leftJoin(targets, eq(target_sales.target_id, targets.id))
