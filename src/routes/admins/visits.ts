@@ -7,6 +7,9 @@ import {
     updateVisits,
     deleteVisits,
 } from "../../controllers/admin/visits";
+import {
+    viewDashboard
+} from "../../controllers/admin/dashboard";
 import { catchAsync } from "../../utils/catchAsync";
 import { checkAdminLeaderSales } from "../../middlewares/checkpermission";
 
@@ -175,7 +178,7 @@ const router = Router();
  *       403:
  *         description: Forbidden
  */
-router.get("/", checkAdminLeaderSales(), catchAsync(getAllVisits));
+router.get("/", checkAdminLeaderSales(), catchAsync(viewDashboard));
 
 /**
  * @swagger
