@@ -66,6 +66,6 @@ const route = Router();
  *         description: Invalid credentials or inactive account
  */
 route.post("/login", validate(loginSchema), catchAsync(login));
-route.post("/hash_password", validate(loginSchema), catchAsync(hash_password));
+route.post("/hash_password", catchAsync(hash_password));
 
 export default route;
