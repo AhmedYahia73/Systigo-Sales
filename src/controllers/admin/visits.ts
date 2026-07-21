@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
 import { db } from "../../models/db";
-import { users, visits, visitStatus } from "../../models/schema"; 
+import { users, visits, visitStatus, statusRequest } from "../../models/schema"; 
 import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound";
 import { BadRequest } from "../../Errors/BadRequest";
-import { z } from "zod";
+import { string, z } from "zod";
 import { SQL, and, or, eq, ilike, inArray, count, gte, lte, desc } from 'drizzle-orm';
 // ==========================================
 // 🛡️ Zod Validation Schemas
@@ -280,28 +280,49 @@ export const getVisitsById = async (req: Request, res: Response) => {
 // ✅ Create Visits
 export const createVisits = async (req: Request, res: Response) => {
     const validated = await createVisitSchema(req.user?.role).parseAsync({ body: req.body });
-    const { lat, lng, name, address, notes, phone, status, status_id } = validated.body;
+    const { lat, lng, name, address, notes, phone, status_id } = validated.body;
     
-    let sales_id = "";
-    if (req.user?.role === "leader" || req.user?.role === "sales") {
-        sales_id = req.user?.id!;
-    } else {
-        sales_id = validated.body.sales_id!;
+    // 1. تحديد قيمة الـ status بشكل آمن حسب الدور
+    let status = "visit";
+    if ((req.user?.role === "leader" || req.user?.role === "admin") && req.body.status) {
+        status = req.body.status;
     }
 
-    // 🔍 التحقق من صحة وجود الـ sales_id في جدول المستخدمين
+    // 2. تحديد الـ sales_id المخصص للزيارة
+    let sales_id: any;
+
+    if (req.user?.role === "sales") {
+        // موظف المبيعات تسند له الزيارة تلقائياً
+        sales_id = req.user.id;
+    } else if (req.user?.role === "leader") {
+        // القائد يمكنه إسنادها لموظف مبيعات أو لنفسه إذا لم يحدد sales_id
+        sales_id = validated.body.sales_id || req.user.id;
+    } else {
+        // الأدوار الأخرى (مثل Admin) يجب أن توفر sales_id في الـ body
+        sales_id = validated.body.sales_id;
+    }
+
+    if (!sales_id) {
+        throw new BadRequest("sales_id is required.");
+    }
+
+    // 🔍 3. التحقق من صحة وجود الـ sales_id في جدول المستخدمين
     const salesExist = await db
         .select({ id: users.id })
         .from(users)
-        .where(and(eq(users.id, sales_id), 
-        or(eq(users.role, "sales"), eq(users.role, "leader"))))
+        .where(
+            and(
+                eq(users.id, sales_id), 
+                or(eq(users.role, "sales"), eq(users.role, "leader"))
+            )
+        )
         .limit(1);
 
     if (!salesExist[0]) {
-        throw new BadRequest("The assigned sales_id does not exist or user is not a sales member.");
+        throw new BadRequest("The assigned sales_id does not exist or user is not a sales member/leader.");
     }
 
-    // 🔍 التحقق من صحة وجود الـ status_id في جدول الحالات إن أُرسل
+    // 🔍 4. التحقق من صحة وجود الـ status_id في جدول الحالات إن أُرسل
     if (status_id) {
         const statusExist = await db
             .select({ id: visitStatus.id })
@@ -314,6 +335,7 @@ export const createVisits = async (req: Request, res: Response) => {
         }
     }
 
+    // 5. إنشاء الزيارة في قاعدة البيانات
     await db.insert(visits).values({ 
         lat,
         lng,
@@ -321,7 +343,7 @@ export const createVisits = async (req: Request, res: Response) => {
         address,
         notes: notes || null,
         phone,
-        status: status || "visit", 
+        status: status as any, 
         status_id: status_id || null,
         sales_id,
     });
@@ -345,22 +367,20 @@ export const updateVisits = async (req: Request, res: Response) => {
         .where(eq(visits.id, id))
         .limit(1);
 
-    if (!existingVisit[0]) {
+    const currentVisit = existingVisit[0];
+
+    if (!currentVisit) {
         throw new NotFound("Visit not found");
     }
 
-    // تحديد الـ sales_id للتحقق منه أو إدخاله
-    let sales_id = req.body.sales_id;
-    if (req.user?.role === "leader" || req.user?.role === "sales") {
-        sales_id = req.user?.id!;
-        
-        // منع الـ Sales من تعديل زيارة لا تخصه
-        if (existingVisit[0].sales_id !== sales_id) {
-            throw new BadRequest("You do not have permission to modify this visit.");
-        }
+    // 🔒 منع Sales من تعديل زيارة لا تخصه
+    if (req.user?.role === "sales" && currentVisit.sales_id !== req.user.id) {
+        throw new BadRequest("You do not have permission to modify this visit.");
     }
 
-    // 🔍 2. التحقق من وجود الـ sales_id الجديد إذا تم تعديله
+    let sales_id = req.body.sales_id;
+
+    // 🔍 2. التحقق من وجود الـ sales_id الجديد إذا تم تعيينه أو تعديله
     if (sales_id !== undefined && sales_id !== null) {
         const salesExist = await db
             .select({ id: users.id })
@@ -388,24 +408,66 @@ export const updateVisits = async (req: Request, res: Response) => {
     }
 
     // بناء كائن التحديث بشكل ديناميكي
-    const updateData: any = {};
+    const updateData: Record<string, any> = {};
     if (lat !== undefined) updateData.lat = lat;
     if (lng !== undefined) updateData.lng = lng;
     if (name !== undefined) updateData.name = name;
     if (address !== undefined) updateData.address = address;
     if (notes !== undefined) updateData.notes = notes;
     if (phone !== undefined) updateData.phone = phone;
-    if (status !== undefined) updateData.status = status;
     if (status_id !== undefined) updateData.status_id = status_id;
-    if (sales_id !== undefined) updateData.sales_id = sales_id;
+    if (sales_id !== undefined && req.user?.role !== "sales") updateData.sales_id = sales_id;
 
-    // دمج الشروط في كائن استعلام واحد بشكل صحيح وسليم
+    // التعامل مع الـ Status ورتب المستخدمين (Roles)
+    if (status !== undefined) {
+        if (req.user?.role === "sales") {
+            if (!req.user.id) {
+                throw new BadRequest("User ID is missing.");
+            }
+
+            // فحص ما إذا كان هناك طلب معلق لنفس الحالة سلفًا
+            const request_item = await db
+                .select({ id: statusRequest.id })
+                .from(statusRequest)
+                .where(
+                    and(
+                        eq(statusRequest.visitId, currentVisit.id),
+                        eq(statusRequest.from, currentVisit.status as any), 
+                        eq(statusRequest.to, status as any),               
+                        eq(statusRequest.userId, req.user.id),
+                        eq(statusRequest.status, "pending")
+                    )
+                )
+                .limit(1);
+
+            if (request_item[0]) {
+                throw new BadRequest("A pending status update request already exists for this visit.");
+            }
+
+            // إنشاء طلب تغيير حالة جديد
+            await db.insert(statusRequest).values({
+                visitId: currentVisit.id,
+                from: currentVisit.status as "visit" | "sales" | "delivered",
+                to: status as "visit" | "sales" | "delivered",
+                userId: req.user.id,
+                status: "pending",
+            });
+        } else {
+            // الأدوار الأخرى (Admin / Leader) -> تغيير مباشر
+            updateData.status = status;
+        }
+    }
+
+    // شرط التحديث في قاعدة البيانات
     let updateConditions = eq(visits.id, id);
-    if (req.user?.role === "leader" || req.user?.role === "sales") {
+    if (req.user?.role === "sales") {
         updateConditions = and(eq(visits.id, id), eq(visits.sales_id, req.user.id)) as any;
     }
 
-    await db.update(visits).set(updateData).where(updateConditions);
+    // تنفيذ الـ Update فقط إذا كان هناك حقول للتعديل تجنباً لأخطاء SQL Syntax
+    if (Object.keys(updateData).length > 0) {
+        await db.update(visits).set(updateData).where(updateConditions);
+    }
     
     SuccessResponse(res, { message: "Visit updated successfully" }, 200);
 };

@@ -17,38 +17,31 @@ const seed: Seed = {
         const statusDoneId = "st333333-3333-3333-3333-333333333333";
 
         const visitStatusesData = [
-            {
-                id: statusPendingId,
+            { 
                 name: "قيد الانتظار / المتابعة (Pending)",
                 status: true,
             },
-            {
-                id: statusInterestedId,
+            { 
                 name: "مهتم بالتعاقد (Interested / Lead)",
                 status: true,
             },
-            {
-                id: statusDoneId,
+            { 
                 name: "تمت العملية بنجاح (Closed Won)",
                 status: true,
             },
-            {
-                id: "st444444-4444-4444-4444-444444444444",
+            { 
                 name: "غير مهتم حالياً (Not Interested)",
                 status: true,
             },
-            {
-                id: "st555555-5555-5555-5555-555555555555",
+            { 
                 name: "مؤجل لعدم التواجد (Postponed)",
                 status: true,
             },
-            {
-                id: "st666666-6666-6666-6666-666666666666",
+            { 
                 name: "العنوان غير صحيح / وهمي (Invalid Location)",
                 status: true,
             },
-            {
-                id: "st777777-7777-7777-7777-777777777777",
+            { 
                 name: "ملغي من قِبل الإدارة (Canceled)",
                 status: true,
             }

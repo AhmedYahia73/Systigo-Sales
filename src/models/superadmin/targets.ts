@@ -7,6 +7,7 @@ import {
   mysqlEnum,
   double,
   char,
+  int
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
 
@@ -27,6 +28,7 @@ import { sql } from "drizzle-orm";
  *       required:
  *         - name
  *         - number
+ *         - year
  *       properties:
  *         id:
  *           type: string
@@ -48,6 +50,10 @@ import { sql } from "drizzle-orm";
  *           format: double
  *           description: The target metric number (value in currency or visits count)
  *           example: 150000.00
+ *         year:
+ *           type: int
+ *           description: The target year
+ *           example: 2026
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -61,7 +67,6 @@ export const targets = mysqlTable("targets", {
   id: char("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
   type: mysqlEnum("type", ["visit", "sales"]).default("visit"),
   name: varchar("name", { length: 255 }).notNull(),
-  number: double("number").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });

@@ -2,64 +2,70 @@
 
 import { Request, Response } from "express";
 import { db } from "../../models/db";
-import { targets } from "../../models/schema";
+import { targets, target_items, target_sales } from "../../models/schema";
 import { eq } from "drizzle-orm";
 import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound";
 import { z } from "zod";
-import { float } from "drizzle-orm/mysql-core";
+import crypto from "crypto"; // لتوليد الـ UUID وضمان ربط العلاقات بدقة
 
 // ==========================================
 // 🛡️ Zod Validation Schemas
 // ==========================================
 
-// الـ Schema الخاص بإنشاء target جديد
 export const createTargetSchema = z.object({
   body: z.object({
     type: z.enum(["visit", "sales"], {
       required_error: "Type is required",
       invalid_type_error: "Type must be either 'visit' or 'sales'",
     }).default("visit"),
+    
     name: z.string({
       required_error: "Name is required",
     })
     .min(1, "Name cannot be empty")
     .max(255, "Name cannot exceed 255 characters"),
-    number: z.number({
-      required_error: "Number is required",
-      invalid_type_error: "Number must be a valid numeric value",
-    }),
+
+    // الـ items تحتوي على السنين والشهور والمستهدف الرقمي الخاص بها
+    items: z.array(
+      z.object({
+        year: z.number({ required_error: "Year is required" }).int(),
+        month: z.number({ required_error: "Month is required" }).int().min(1).max(12),
+        number: z.number({ required_error: "Monthly target number is required" }).positive(),
+      }),
+      { required_error: "Items are required" }
+    ).min(1, "At least one target item is required"),
+
+    // الـ sales مستخدمين مربوطين بهذا التارجت
+    sales: z.array(
+      z.string({ invalid_type_error: "Sales User ID must be a string" }).uuid("Invalid User ID format"),
+      { required_error: "Sales users array is required" }
+    ).min(1, "At least one sales user must be assigned"),
   }),
 });
 
-// الـ Schema الخاص بتحديث target (البيانات اختيارية ولكن إذا أرسلت يجب أن تطابق الأنواع)
+// تعديل سكيما التحديث بناءً على الحقول الفعلية في جدول targets فقط
 export const updateTargetSchema = z.object({
   params: z.object({
-    id: z.string({ required_error: "ID is required in parameters" }), // غيرها لـ z.coerce.number() لو الـ ID رقم في قاعدة البيانات
+    id: z.string({ required_error: "ID is required in parameters" }),
   }),
   body: z.object({
-    type: z.enum(["visit", "sales"], {
-      invalid_type_error: "Type must be either 'visit' or 'sales'",
-    }).optional(),
+    type: z.enum(["visit", "sales"]).optional(),
     name: z.string().min(1, "Name cannot be empty").max(255).optional(),
-    number: z.number({ invalid_type_error: "Number must be a numeric value" }).optional(),
   }),
 });
 
-// الـ Schema الخاص بالعمليات التي تتطلب ID فقط أو الـ query params
 export const targetIdSchema = z.object({
   params: z.object({
-    id: z.string({ required_error: "ID is required in parameters" }), // غيرها لـ z.coerce.number() لو الـ ID رقم في قاعدة البيانات
+    id: z.string({ required_error: "ID is required in parameters" }),
   }),
 });
 
-// التحقق من الـ Route Params عند جلب الكل بنوع محدد (اختياري)
 export const getAllTargetsSchema = z.object({
   params: z.object({
     type: z.enum(["visit", "sales"]).optional(),
   }),
 });
-
 
 // ==========================================
 // 🎮 Controllers
@@ -67,30 +73,23 @@ export const getAllTargetsSchema = z.object({
 
 // ✅ Get All Targets
 export const getAllTargets = async (req: Request, res: Response) => {
-    // التحقق من الـ params إن وُجدت
     const validated = await getAllTargetsSchema.parseAsync({ params: req.params });
     const { type } = validated.params;
 
-    // 1. بناء الاستعلام الأساسي
     let query = db
         .select({
             id: targets.id,
             type: targets.type,
             name: targets.name,
-            number: targets.number, 
         })
         .from(targets);
 
-    // 2. تصفية النتائج بناءً على النوع لو تم إرساله
     if (type) {
         query = query.where(eq(targets.type, type)) as typeof query;
     }
 
-    // 3. تنفيذ الاستعلام
     const alltargets = await query;
-
-    // 4. إرسال الرد
-    SuccessResponse(res, { sales: alltargets }, 200);
+    SuccessResponse(res, { targets: alltargets }, 200);
 }; 
 
 // ✅ Get Targets By ID
@@ -98,36 +97,57 @@ export const getTargetsById = async (req: Request, res: Response) => {
     const validated = await targetIdSchema.parseAsync({ params: req.params });
     const { id } = validated.params; 
 
-    const Targets = await db
+    const result = await db
         .select({
             id: targets.id,
             type: targets.type, 
             name: targets.name, 
-            number: targets.number, 
         })
         .from(targets) 
         .where(eq(targets.id, id))
         .limit(1);
 
-    if (!Targets[0]) {
-        throw new NotFound("Targets not found");
+    if (!result[0]) {
+        throw new NotFound("Target not found");
     }
 
-    SuccessResponse(res, { Targets: Targets[0] }, 200);
+    SuccessResponse(res, { target: result[0] }, 200);
 };
 
-// ✅ Create Targets
+// ✅ Create Targets (تعديل جذري لربط العلاقات بشكل صحيح وآمن)
 export const createTargets = async (req: Request, res: Response) => {
     const validated = await createTargetSchema.parseAsync({ body: req.body });
-    const { type, name, number } = validated.body;
-    
-    await db.insert(targets).values({
-        type,
-        name,
-        number: number, // لو حقل الداتابيز double كـ string أو اتركها number حسب الـ schema عندك
+    const { type, name, items, sales } = validated.body;
+
+    // توليد المعرّف الفريد مسبقاً في السيرفر لضمان ربطه بدقة في الجداول الفرعية
+    const targetId = crypto.randomUUID();
+
+    await db.transaction(async (tx) => {
+        // 1. إدخال التارجت الرئيسي بالـ id المولّد
+        await tx.insert(targets).values({
+            id: targetId,
+            type,
+            name,
+        });
+
+        // 2. إدخال العناصر (items) وربطها بالـ targetId
+        const itemsToInsert = items.map(item => ({
+            target_id: targetId,
+            year: item.year,
+            month: item.month,
+            number: item.number
+        }));
+        await tx.insert(target_items).values(itemsToInsert);
+
+        // 3. إدخال المبيعات (sales) وربطها بالـ targetId والـ user_id
+        const salesToInsert = sales.map(userId => ({
+            target_id: targetId,
+            user_id: userId
+        }));
+        await tx.insert(target_sales).values(salesToInsert);
     });
 
-    SuccessResponse(res, { message: "Targets created successfully" }, 201);
+    SuccessResponse(res, { message: "Target along with multiple items and sales created successfully" }, 201);
 };
 
 // ✅ Update Targets
@@ -137,9 +157,8 @@ export const updateTargets = async (req: Request, res: Response) => {
         body: req.body 
     });
     const { id } = validated.params;
-    const { type, name, number } = validated.body;
+    const bodyData = validated.body;
   
-    // التأكد أولاً من وجود العنصر قبل التحديث
     const existingTargets = await db
         .select()
         .from(targets)
@@ -147,19 +166,19 @@ export const updateTargets = async (req: Request, res: Response) => {
         .limit(1);
 
     if (!existingTargets[0]) {
-        throw new NotFound("Targets not found");
+        throw new NotFound("Target not found");
     }
 
-    // بناء كائن التحديث ديناميكياً لتجنب إرسال قيم undefined
-    const updateData: Partial<{ type: "visit" | "sales"; name: string; number: number }> = {};
-    if (type !== undefined) updateData.type = type;
-    if (name !== undefined) updateData.name = name;
-    if (number !== undefined) updateData.number = Number(number);
-    if(updateData){
+    // تنظيف البيانات وعمل التحديث لحقول جدول الـ targets الفعلي فقط (type أو name)
+    const updateData = Object.fromEntries(
+        Object.entries(bodyData).filter(([_, value]) => value !== undefined)
+    );
+
+    if (Object.keys(updateData).length > 0) {
         await db.update(targets).set(updateData).where(eq(targets.id, id));
     }
 
-    SuccessResponse(res, { message: "Targets updated successfully" }, 200);
+    SuccessResponse(res, { message: "Target updated successfully" }, 200);
 };
 
 // ✅ Delete Targets
@@ -174,10 +193,12 @@ export const deleteTargets = async (req: Request, res: Response) => {
         .limit(1);
 
     if (!existingTargets[0]) {
-        throw new NotFound("Targets not found");
+        throw new NotFound("Target not found");
     }
  
+    // ميزة الـ onDelete: "cascade" التي قمت بتعريفها في جداولك 
+    // ستقوم بحذف جميع الـ items والـ sales المرتبطة بهذا المعرف تلقائياً من قاعدة البيانات.
     await db.delete(targets).where(eq(targets.id, id));
 
-    SuccessResponse(res, { message: "Targets deleted successfully" }, 200);
+    SuccessResponse(res, { message: "Target deleted successfully" }, 200);
 };

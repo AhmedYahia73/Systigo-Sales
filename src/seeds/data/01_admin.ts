@@ -22,8 +22,7 @@ const seed: Seed = {
 
         // 1. إدخال الـ Admins (المدراء)
         const adminsData = [
-            {
-                id: "a0000001-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            { 
                 name: "أحمد العشري (مدير النظام)",
                 email: "admin1@crm.com",
                 phone: "+201011111111",
@@ -31,8 +30,7 @@ const seed: Seed = {
                 role: "admin" as const,
                 status: "active" as const,
             },
-            {
-                id: "a0000002-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            { 
                 name: "منى محمود (إدارة العمليات)",
                 email: "admin2@crm.com",
                 phone: "+201022222222",
@@ -44,8 +42,7 @@ const seed: Seed = {
 
         // 2. إدخال الـ Leaders (قادة الفرق)
         const leadersData = [
-            {
-                id: leader1Id,
+            { 
                 name: "كريم خالد (قائد فريق القاهرة)",
                 email: "karim.leader@crm.com",
                 phone: "+201033333333",
@@ -53,8 +50,7 @@ const seed: Seed = {
                 role: "leader" as const,
                 status: "active" as const,
             },
-            {
-                id: leader2Id,
+            { 
                 name: "ياسمين تامر (قائدة فريق الإسكندرية)",
                 email: "yasmin.leader@crm.com",
                 phone: "+201044444444",
@@ -62,8 +58,7 @@ const seed: Seed = {
                 role: "leader" as const,
                 status: "active" as const,
             },
-            {
-                id: leader3Id,
+            { 
                 name: "مصطفى هلال (قائد المبيعات الخارجية)",
                 email: "mostafa.leader@crm.com",
                 phone: "+201055555555",
@@ -76,8 +71,7 @@ const seed: Seed = {
         // 3. إدخال الـ Sales (موظفي المبيعات) وتوزيعهم بالتساوي على القادة
         const salesData = [
             // 👥 مبيعات تابعين للقائد الأول (كريم)
-            {
-                id: "s1000001-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            { 
                 name: "عمر شريف",
                 email: "omar.sales@crm.com",
                 phone: "+201066666661",
@@ -86,8 +80,7 @@ const seed: Seed = {
                 leader_id: leader1Id,
                 status: "active" as const,
             },
-            {
-                id: "s1000002-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            { 
                 name: "نهى فريد",
                 email: "noha.sales@crm.com",
                 phone: "+201066666662",
@@ -96,8 +89,7 @@ const seed: Seed = {
                 leader_id: leader1Id,
                 status: "active" as const,
             },
-            {
-                id: "s1000003-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            { 
                 name: "زياد طارق",
                 email: "ziad.sales@crm.com",
                 phone: "+201066666663",
@@ -108,8 +100,7 @@ const seed: Seed = {
             },
 
             // 👥 مبيعات تابعين للقائد الثاني (ياسمين)
-            {
-                id: "s2000001-cccc-cccc-cccc-cccccccccccc",
+            { 
                 name: "سارة سليمان",
                 email: "sarah.sales@crm.com",
                 phone: "+201077777771",
@@ -118,8 +109,7 @@ const seed: Seed = {
                 leader_id: leader2Id,
                 status: "active" as const,
             },
-            {
-                id: "s2000002-cccc-cccc-cccc-cccccccccccc",
+            { 
                 name: "مروان أمين",
                 email: "marwan.sales@crm.com",
                 phone: "+201077777772",
@@ -128,8 +118,7 @@ const seed: Seed = {
                 leader_id: leader2Id,
                 status: "active" as const,
             },
-            {
-                id: "s2000003-cccc-cccc-cccc-cccccccccccc",
+            { 
                 name: "دينا رامي",
                 email: "dina.sales@crm.com",
                 phone: "+201077777773",
@@ -140,8 +129,7 @@ const seed: Seed = {
             },
 
             // 👥 مبيعات تابعين للقائد الثالث (مصطفى)
-            {
-                id: "s3000001-dddd-dddd-dddd-dddddddddddd",
+            { 
                 name: "خالد منصور",
                 email: "khaled.sales@crm.com",
                 phone: "+201088888881",
@@ -150,8 +138,7 @@ const seed: Seed = {
                 leader_id: leader3Id,
                 status: "active" as const,
             },
-            {
-                id: "s3000002-dddd-dddd-dddd-dddddddddddd",
+            { 
                 name: "ميادة حسن",
                 email: "mayada.sales@crm.com",
                 phone: "+201088888882",
@@ -160,8 +147,7 @@ const seed: Seed = {
                 leader_id: leader3Id,
                 status: "active" as const,
             },
-            {
-                id: "s3000003-dddd-dddd-dddd-dddddddddddd",
+            { 
                 name: "هاني يوسف",
                 email: "hani.sales@crm.com",
                 phone: "+201088888883",

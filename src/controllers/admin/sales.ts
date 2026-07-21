@@ -137,7 +137,7 @@ export const getAllSales = async (req: Request, res: Response) => {
             phone: users.phone,
             image: users.image,
             target: targets.name,
-            target_number: targets.number,
+            target_name: targets.name,
             leader_name: leaderAlias.name,
             leader_phone: leaderAlias.phone,
             status: users.status, 
