@@ -21,5 +21,5 @@ route.use("/target", catchAsync(targetRouter));
 route.use("/admins", catchAsync(adminRouter));
 route.use("/visits", catchAsync(visitsRouter));
 route.use("/wish_list", catchAsync(wishListRouter));
-route.use("/", catchAsync(dashboardRouter));
+route.use("/dashboard", catchAsync(dashboardRouter));
 export default route;
