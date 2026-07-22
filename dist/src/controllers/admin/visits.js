@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteVisits = exports.updateVisits = exports.createVisits = exports.getVisitsById = exports.lists = exports.getAllVisits = exports.VisitIdSchema = exports.updateVisitSchema = exports.createVisitSchema = void 0;
+exports.deleteVisits = exports.updateVisits = exports.createVisits = exports.getVisitsById = exports.lists = exports.getVisitsCounts = exports.getAllSales = exports.getAllVisits = exports.VisitIdSchema = exports.updateVisitSchema = exports.createVisitSchema = void 0;
 const db_1 = require("../../models/db");
 const schema_1 = require("../../models/schema");
 const response_1 = require("../../utils/response");
@@ -82,6 +82,7 @@ const getAllVisits = async (req, res) => {
     const toDateStr = req.query.to; // مثلاً: 2026-05-05
     const offset = (page - 1) * limit;
     let whereConditions = [];
+    whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.status, "visit"));
     // 1. تطبيق الصلاحيات والفلترة الذكية لـ Drizzle
     if (userRole === "admin") {
         if (querySalesId) {
@@ -197,6 +198,218 @@ const getAllVisits = async (req, res) => {
     }, 200);
 };
 exports.getAllVisits = getAllVisits;
+// ✅ Get All Visitsexport 
+const getAllSales = async (req, res) => {
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
+    const querySalesId = req.query.sales_id;
+    // استقبال معايير الـ Pagination والبحث
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || '';
+    // استقبال معايير فلترة التاريخ (صيغة المتوقع: YYYY-MM-DD)
+    const fromDateStr = req.query.from; // مثلاً: 2026-05-05
+    const toDateStr = req.query.to; // مثلاً: 2026-05-05
+    const offset = (page - 1) * limit;
+    let whereConditions = [];
+    whereConditions.push((0, drizzle_orm_1.ne)(schema_1.visits.status, "visit"));
+    // 1. تطبيق الصلاحيات والفلترة الذكية لـ Drizzle
+    if (userRole === "admin") {
+        if (querySalesId) {
+            whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, querySalesId));
+        }
+    }
+    else if (userRole === "leader") {
+        const teamSales = await db_1.db
+            .select({ id: schema_1.users.id })
+            .from(schema_1.users)
+            .where((0, drizzle_orm_1.or)((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.leader_id, userId), (0, drizzle_orm_1.eq)(schema_1.users.role, "sales")), (0, drizzle_orm_1.eq)(schema_1.users.id, userId)));
+        const salesIds = teamSales.map(s => s.id);
+        if (querySalesId) {
+            if (salesIds.includes(querySalesId)) {
+                whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, querySalesId));
+            }
+            else {
+                throw new BadRequest_1.BadRequest("You do not have access to this sales member's visits.");
+            }
+        }
+        else {
+            if (salesIds.length > 0) {
+                whereConditions.push((0, drizzle_orm_1.inArray)(schema_1.visits.sales_id, salesIds));
+            }
+            else {
+                return (0, response_1.SuccessResponse)(res, { allVisits: [], pagination: { total: 0, page, limit, totalPages: 0 } }, 200);
+            }
+        }
+    }
+    else if (userRole === "sales") {
+        whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, userId));
+    }
+    else {
+        throw new BadRequest_1.BadRequest("Unauthorized role");
+    }
+    // 2. تطبيق البحث (Search) بناءً على الاسم، الإيميل، أو الهاتف
+    if (search) {
+        const searchPattern = `%${search}%`;
+        whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.ilike)(schema_1.visits.name, searchPattern), // اسم العميل/الزيارة
+        (0, drizzle_orm_1.ilike)(schema_1.visits.phone, searchPattern), // هاتف العميل/الزيارة
+        (0, drizzle_orm_1.ilike)(schema_1.users.name, searchPattern), // اسم المندوب
+        (0, drizzle_orm_1.ilike)(schema_1.users.email, searchPattern), // إيميل المندوب
+        (0, drizzle_orm_1.ilike)(schema_1.users.phone, searchPattern) // هاتف المندوب
+        ));
+    }
+    // 3. تطبيق الفلترة بالتاريخ بدون وقت (Date-only filter)
+    // نستخدم الكائنات الافتراضية للوقت للتأكد من جلب اليوم كاملاً (من 00:00:00 إلى 23:59:59)
+    if (fromDateStr) {
+        const fromDate = new Date(`${fromDateStr}T00:00:00.000Z`);
+        if (!isNaN(fromDate.getTime())) {
+            whereConditions.push((0, drizzle_orm_1.gte)(schema_1.visits.createdAt, fromDate));
+        }
+    }
+    if (toDateStr) {
+        const toDate = new Date(`${toDateStr}T23:59:59.999Z`);
+        if (!isNaN(toDate.getTime())) {
+            whereConditions.push((0, drizzle_orm_1.lte)(schema_1.visits.createdAt, toDate));
+        }
+    }
+    // 4. بناء الاستعلام الأساسي (Base Query)
+    let baseQuery = db_1.db
+        .select({
+        id: schema_1.visits.id,
+        lat: schema_1.visits.lat,
+        lng: schema_1.visits.lng,
+        name: schema_1.visits.name,
+        address: schema_1.visits.address,
+        notes: schema_1.visits.notes,
+        phone: schema_1.visits.phone,
+        status: schema_1.visits.status,
+        visit_status: schema_1.visitStatus.name,
+        status_id: schema_1.visits.status_id,
+        sales: schema_1.users.name,
+        sales_phone: schema_1.users.phone,
+        createdAt: schema_1.visits.createdAt
+    })
+        .from(schema_1.visits)
+        .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.visits.sales_id, schema_1.users.id))
+        .leftJoin(schema_1.visitStatus, (0, drizzle_orm_1.eq)(schema_1.visits.status_id, schema_1.visitStatus.id))
+        .orderBy((0, drizzle_orm_1.desc)(schema_1.visits.createdAt))
+        .$dynamic();
+    // 5. استعلام لحساب العدد الإجمالي متوافق مع الفلاتر (Count Query)
+    let countQuery = db_1.db
+        .select({ total: (0, drizzle_orm_1.count)() })
+        .from(schema_1.visits)
+        .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.visits.sales_id, schema_1.users.id))
+        .leftJoin(schema_1.visitStatus, (0, drizzle_orm_1.eq)(schema_1.visits.status_id, schema_1.visitStatus.id))
+        .$dynamic();
+    // ربط الشروط بالاستعلامات
+    if (whereConditions.length > 0) {
+        baseQuery = baseQuery.where((0, drizzle_orm_1.and)(...whereConditions));
+        countQuery = countQuery.where((0, drizzle_orm_1.and)(...whereConditions));
+    }
+    // تنفيذ الاستعلامين معاً بالتوازي لتحسين الأداء
+    const [allVisitsRaw, [{ total: totalCount }]] = await Promise.all([
+        baseQuery.limit(limit).offset(offset),
+        countQuery
+    ]);
+    // إضافة رابط الخريطة تلقائياً لكل زيارة
+    const allVisits = allVisitsRaw.map((visit) => ({
+        ...visit,
+        map_link: `https://www.google.com/maps/search/?api=1&query=${visit.lat},${visit.lng}`
+    }));
+    // إرسال النتيجة مع معلومات الـ pagination الكاملة
+    (0, response_1.SuccessResponse)(res, {
+        allVisits,
+        pagination: {
+            total: totalCount,
+            page,
+            limit,
+            totalPages: Math.ceil(totalCount / limit)
+        }
+    }, 200);
+};
+exports.getAllSales = getAllSales;
+const getVisitsCounts = async (req, res) => {
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
+    const querySalesId = req.query.sales_id;
+    // استقبال معايير البحث والتواريخ
+    const search = req.query.search || '';
+    const fromDateStr = req.query.from; // مثلاً: 2026-05-05
+    const toDateStr = req.query.to; // مثلاً: 2026-05-05
+    let whereConditions = [];
+    // 1. تطبيق الصلاحيات والفلترة لـ Drizzle
+    if (userRole === "admin") {
+        if (querySalesId) {
+            whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, querySalesId));
+        }
+    }
+    else if (userRole === "leader") {
+        const teamSales = await db_1.db
+            .select({ id: schema_1.users.id })
+            .from(schema_1.users)
+            .where((0, drizzle_orm_1.or)((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.leader_id, userId), (0, drizzle_orm_1.eq)(schema_1.users.role, "sales")), (0, drizzle_orm_1.eq)(schema_1.users.id, userId)));
+        const salesIds = teamSales.map(s => s.id);
+        if (querySalesId) {
+            if (salesIds.includes(querySalesId)) {
+                whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, querySalesId));
+            }
+            else {
+                throw new BadRequest_1.BadRequest("You do not have access to this sales member's visits.");
+            }
+        }
+        else {
+            if (salesIds.length > 0) {
+                whereConditions.push((0, drizzle_orm_1.inArray)(schema_1.visits.sales_id, salesIds));
+            }
+            else {
+                return (0, response_1.SuccessResponse)(res, { visitCount: 0, notVisitCount: 0, total: 0 }, 200);
+            }
+        }
+    }
+    else if (userRole === "sales") {
+        whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, userId));
+    }
+    else {
+        throw new BadRequest_1.BadRequest("Unauthorized role");
+    }
+    // 2. تطبيق البحث (Search)
+    if (search) {
+        const searchPattern = `%${search}%`;
+        whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.ilike)(schema_1.visits.name, searchPattern), (0, drizzle_orm_1.ilike)(schema_1.visits.phone, searchPattern), (0, drizzle_orm_1.ilike)(schema_1.users.name, searchPattern), (0, drizzle_orm_1.ilike)(schema_1.users.email, searchPattern), (0, drizzle_orm_1.ilike)(schema_1.users.phone, searchPattern)));
+    }
+    // 3. تطبيق الفلترة بالتاريخ
+    if (fromDateStr) {
+        const fromDate = new Date(`${fromDateStr}T00:00:00.000Z`);
+        if (!isNaN(fromDate.getTime())) {
+            whereConditions.push((0, drizzle_orm_1.gte)(schema_1.visits.createdAt, fromDate));
+        }
+    }
+    if (toDateStr) {
+        const toDate = new Date(`${toDateStr}T23:59:59.999Z`);
+        if (!isNaN(toDate.getTime())) {
+            whereConditions.push((0, drizzle_orm_1.lte)(schema_1.visits.createdAt, toDate));
+        }
+    }
+    // 4. استعلام واحد لحساب العدّين (visit و not visit) بناءً على الفلاتر
+    const [countsResult] = await db_1.db
+        .select({
+        visitCount: (0, drizzle_orm_1.sql) `COALESCE(COUNT(CASE WHEN ${schema_1.visits.status} = 'visit' THEN 1 END), 0)`,
+        notVisitCount: (0, drizzle_orm_1.sql) `COALESCE(COUNT(CASE WHEN ${schema_1.visits.status} != 'visit' THEN 1 END), 0)`,
+    })
+        .from(schema_1.visits)
+        .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.visits.sales_id, schema_1.users.id))
+        .leftJoin(schema_1.visitStatus, (0, drizzle_orm_1.eq)(schema_1.visits.status_id, schema_1.visitStatus.id))
+        .where(whereConditions.length > 0 ? (0, drizzle_orm_1.and)(...whereConditions) : undefined);
+    const visitCount = Number(countsResult?.visitCount || 0);
+    const notVisitCount = Number(countsResult?.notVisitCount || 0);
+    // 5. إرسال الأعداد فقط في الاستجابة
+    (0, response_1.SuccessResponse)(res, {
+        visitCount, // عدد الزيارات التي حالتها تساوي "visit"
+        notVisitCount, // عدد الزيارات التي حالتها لا تساوي "visit"
+        total: visitCount + notVisitCount // الإجمالي
+    }, 200);
+};
+exports.getVisitsCounts = getVisitsCounts;
 // ✅ Get Active Visit Statuses
 const lists = async (req, res) => {
     const visit_status = await db_1.db
@@ -206,7 +419,16 @@ const lists = async (req, res) => {
     })
         .from(schema_1.visitStatus)
         .where((0, drizzle_orm_1.eq)(schema_1.visitStatus.status, true));
-    (0, response_1.SuccessResponse)(res, { visit_status }, 200);
+    const userId = req.user?.id;
+    const sales = await db_1.db
+        .select({
+        id: schema_1.users.id,
+        name: schema_1.users.name,
+        phone: schema_1.users.phone,
+    })
+        .from(schema_1.users)
+        .where((0, drizzle_orm_1.or)((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.leader_id, userId), (0, drizzle_orm_1.eq)(schema_1.users.role, "sales")), (0, drizzle_orm_1.eq)(schema_1.users.id, userId)));
+    (0, response_1.SuccessResponse)(res, { visit_status, sales }, 200);
 };
 exports.lists = lists;
 // ✅ Get Visits By ID

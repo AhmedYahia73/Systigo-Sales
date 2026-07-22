@@ -167,6 +167,8 @@ const router = (0, express_1.Router)();
  *         description: Forbidden
  */
 router.get("/", (0, checkpermission_1.checkAdminLeaderSales)(), (0, catchAsync_1.catchAsync)(visits_1.getAllVisits));
+router.get("/sales", (0, checkpermission_1.checkAdminLeaderSales)(), (0, catchAsync_1.catchAsync)(visits_1.getAllSales));
+router.get("/report", (0, checkpermission_1.checkAdminLeaderSales)(), (0, catchAsync_1.catchAsync)(visits_1.getVisitsCounts));
 /**
  * @swagger
  * /api/admin/visits/lists:
