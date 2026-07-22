@@ -91,7 +91,7 @@ const router = Router();
  *         description: Forbidden
  */
 router.get("/", checkOnlyAdmin(), catchAsync(getAllTargets));
-router.get("/lists", checkOnlyAdmin(), catchAsync(lists));
+router.get("/sales/lists", checkOnlyAdmin(), catchAsync(lists));
 
 /**
  * @swagger
