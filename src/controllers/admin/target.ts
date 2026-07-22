@@ -91,6 +91,30 @@ export const getAllTargets = async (req: Request, res: Response) => {
 }; 
 
 // ✅ Get Target By ID (معدلة لجلب التارجت مع الـ items والـ sales المعنيين)
+export const lists = async (req: Request, res: Response) => {
+  const validated = await targetIdSchema.parseAsync({ params: req.params });
+  const { id } = validated.params; 
+
+  // 1. جلب التارجت الرئيسي
+  const sales = await db
+    .select({
+      id: users.id,
+      phone: users.phone, 
+      name: users.name,  
+    })
+    .from(users) 
+    .where(eq(users.role, "sales"));
+  
+  SuccessResponse(
+    res, 
+    { 
+      sales
+    }, 
+    200
+  );
+};
+
+// ✅ Get Target By ID (معدلة لجلب التارجت مع الـ items والـ sales المعنيين)
 export const getTargetsById = async (req: Request, res: Response) => {
   const validated = await targetIdSchema.parseAsync({ params: req.params });
   const { id } = validated.params; 

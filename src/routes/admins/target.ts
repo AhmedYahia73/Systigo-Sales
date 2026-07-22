@@ -5,6 +5,7 @@ import {
     createTargets,
     updateTargets,
     deleteTargets,
+    lists
 } from "../../controllers/admin/target";
 import { catchAsync } from "../../utils/catchAsync";
 import { checkOnlyAdmin } from "../../middlewares/checkpermission";
@@ -90,6 +91,7 @@ const router = Router();
  *         description: Forbidden
  */
 router.get("/", checkOnlyAdmin(), catchAsync(getAllTargets));
+router.get("/lists", checkOnlyAdmin(), catchAsync(lists));
 
 /**
  * @swagger
