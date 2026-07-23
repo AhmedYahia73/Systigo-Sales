@@ -75,13 +75,13 @@ export const viewDashboard = async (req: Request, res: Response) => {
     if (role === "sales") {
     joinConditions.push(eq(visits.sales_id, userId));
     } else if (role === "leader") {
-    // استخدام inArray شرط أساسي إذا كانت القيمة Array
-    if (sales_ids.length > 0) {
-        joinConditions.push(inArray(visits.sales_id, sales_ids));
-    } else {
-        // في حالة عدم وجود مبيعات تابعين للقائد، يمكنك إضافة شرط يمنع جلب بيانات خاطئة
-        joinConditions.push(sql`1 = 0`); 
-    }
+        // استخدام inArray شرط أساسي إذا كانت القيمة Array
+        if (sales_ids.length > 0) {
+            joinConditions.push(inArray(visits.sales_id, sales_ids));
+        } else {
+            // في حالة عدم وجود مبيعات تابعين للقائد، يمكنك إضافة شرط يمنع جلب بيانات خاطئة
+            joinConditions.push(sql`1 = 0`); 
+        }
     }
     if (visitDateConditions.length > 0) {
         joinConditions.push(...visitDateConditions);
@@ -103,6 +103,14 @@ export const viewDashboard = async (req: Request, res: Response) => {
     const visitsWhereConditions = [];
     if (role === "sales") {
         visitsWhereConditions.push(eq(visits.sales_id, userId));
+    } else if (role === "leader") {
+        // استخدام inArray شرط أساسي إذا كانت القيمة Array
+        if (sales_ids.length > 0) {
+            visitsWhereConditions.push(inArray(visits.sales_id, sales_ids));
+        } else {
+            // في حالة عدم وجود مبيعات تابعين للقائد، يمكنك إضافة شرط يمنع جلب بيانات خاطئة
+            visitsWhereConditions.push(sql`1 = 0`); 
+        }
     }
     if (visitDateConditions.length > 0) {
         visitsWhereConditions.push(...visitDateConditions);

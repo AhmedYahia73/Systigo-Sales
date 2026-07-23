@@ -84,6 +84,16 @@ const viewDashboard = async (req, res) => {
     if (role === "sales") {
         visitsWhereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, userId));
     }
+    else if (role === "leader") {
+        // استخدام inArray شرط أساسي إذا كانت القيمة Array
+        if (sales_ids.length > 0) {
+            visitsWhereConditions.push((0, drizzle_orm_1.inArray)(schema_1.visits.sales_id, sales_ids));
+        }
+        else {
+            // في حالة عدم وجود مبيعات تابعين للقائد، يمكنك إضافة شرط يمنع جلب بيانات خاطئة
+            visitsWhereConditions.push((0, drizzle_orm_1.sql) `1 = 0`);
+        }
+    }
     if (visitDateConditions.length > 0) {
         visitsWhereConditions.push(...visitDateConditions);
     }
