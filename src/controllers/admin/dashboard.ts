@@ -103,7 +103,8 @@ export const viewDashboard = async (req: Request, res: Response) => {
     const visitsWhereConditions = [];
     if (role === "sales") {
         visitsWhereConditions.push(eq(visits.sales_id, userId));
-    } else if (role === "leader") {
+    } 
+    else if (role === "leader") {
         // استخدام inArray شرط أساسي إذا كانت القيمة Array
         if (sales_ids.length > 0) {
             visitsWhereConditions.push(inArray(visits.sales_id, sales_ids));
