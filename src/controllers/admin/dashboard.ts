@@ -2,9 +2,9 @@
 
 import { Request, Response } from "express";
 import { db } from "../../models/db";
-import { visitStatus, visits, target_sales, targets, target_items } from "../../models/schema";
+import { visitStatus, visits, target_sales, targets, target_items, users } from "../../models/schema";
 import { BadRequest } from "../../Errors/BadRequest";
-import { and, or, eq, gte, lte, gt, lt, count, sql, SQL } from "drizzle-orm";
+import { and, or, inArray, eq, gte, lte, gt, lt, count, sql, SQL } from "drizzle-orm";
 import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound"; 
   
@@ -60,11 +60,28 @@ export const viewDashboard = async (req: Request, res: Response) => {
             )
         );
     }
+    // 1. جلب معرفات المبيعات التابعين للقائد
+    const salesList = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.leader_id, userId));
 
-    // 2. بناء شروط الـ Join لجدول الزيارات وحالاتها
+    // استخراج الـ IDs في مصفوفة بسيطة [1, 2, 3]
+    const sales_ids = salesList.map((item) => item.id);
+
+    // 2. بناء شروط الـ Join / Filtering
     const joinConditions = [eq(visits.status_id, visitStatus.id)];
+
     if (role === "sales") {
-        joinConditions.push(eq(visits.sales_id, userId));
+    joinConditions.push(eq(visits.sales_id, userId));
+    } else if (role === "leader") {
+    // استخدام inArray شرط أساسي إذا كانت القيمة Array
+    if (sales_ids.length > 0) {
+        joinConditions.push(inArray(visits.sales_id, sales_ids));
+    } else {
+        // في حالة عدم وجود مبيعات تابعين للقائد، يمكنك إضافة شرط يمنع جلب بيانات خاطئة
+        joinConditions.push(sql`1 = 0`); 
+    }
     }
     if (visitDateConditions.length > 0) {
         joinConditions.push(...visitDateConditions);

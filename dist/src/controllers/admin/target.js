@@ -4,7 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteTargets = exports.updateTargets = exports.createTargets = exports.getTargetsById = exports.getAllTargets = exports.getAllTargetsSchema = exports.targetIdSchema = exports.updateTargetSchema = exports.createTargetSchema = void 0;
+exports.deleteTargets = exports.updateTargets = exports.createTargets = exports.getTargetsById = exports.lists = exports.getAllTargets = exports.getAllTargetsSchema = exports.targetIdSchema = exports.updateTargetSchema = exports.createTargetSchema = void 0;
 const db_1 = require("../../models/db");
 const schema_1 = require("../../models/schema");
 const drizzle_orm_1 = require("drizzle-orm");
@@ -75,6 +75,21 @@ const getAllTargets = async (req, res) => {
     (0, response_1.SuccessResponse)(res, { targets: alltargets }, 200);
 };
 exports.getAllTargets = getAllTargets;
+// ✅ Get Target By ID (معدلة لجلب التارجت مع الـ items والـ sales المعنيين)
+const lists = async (req, res) => {
+    const sales = await db_1.db
+        .select({
+        id: schema_1.users.id,
+        phone: schema_1.users.phone,
+        name: schema_1.users.name,
+    })
+        .from(schema_1.users)
+        .where((0, drizzle_orm_1.eq)(schema_1.users.role, "sales"));
+    (0, response_1.SuccessResponse)(res, {
+        sales
+    }, 200);
+};
+exports.lists = lists;
 // ✅ Get Target By ID (معدلة لجلب التارجت مع الـ items والـ sales المعنيين)
 const getTargetsById = async (req, res) => {
     const validated = await exports.targetIdSchema.parseAsync({ params: req.params });

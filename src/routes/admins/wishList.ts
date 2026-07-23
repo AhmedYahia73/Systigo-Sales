@@ -7,7 +7,7 @@ import {
     deleteWishLists,
 } from "../../controllers/admin/wishlist";
 import { catchAsync } from "../../utils/catchAsync";
-import { checkOnlyAdmin } from "../../middlewares/checkpermission";
+import { checkOnlyAdmin, checkAdminLeaderSales } from "../../middlewares/checkpermission";
 
 const router = Router();
 
@@ -80,7 +80,7 @@ const router = Router();
  *       403:
  *         description: Forbidden
  */
-router.get("/", checkOnlyAdmin(), catchAsync(getAllWishLists));
+router.get("/", checkAdminLeaderSales(), catchAsync(getAllWishLists));
 
 /**
  * @swagger
