@@ -407,7 +407,7 @@ const getVisitsCounts = async (req, res) => {
     // 5. إرسال الأعداد فقط في الاستجابة
     (0, response_1.SuccessResponse)(res, {
         visitCount, // عدد الزيارات التي حالتها تساوي "visit"
-        notVisitCount, // عدد الزيارات التي حالتها لا تساوي "visit"
+        salesCount: notVisitCount, // عدد الزيارات التي حالتها لا تساوي "visit"
         total: visitCount + notVisitCount // الإجمالي
     }, 200);
 };

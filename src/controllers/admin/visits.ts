@@ -471,7 +471,7 @@ export const getVisitsCounts = async (req: Request, res: Response) => {
     // 5. إرسال الأعداد فقط في الاستجابة
     SuccessResponse(res, { 
         visitCount,        // عدد الزيارات التي حالتها تساوي "visit"
-        notVisitCount,     // عدد الزيارات التي حالتها لا تساوي "visit"
+        salesCount: notVisitCount,     // عدد الزيارات التي حالتها لا تساوي "visit"
         total: visitCount + notVisitCount // الإجمالي
     }, 200);
 };

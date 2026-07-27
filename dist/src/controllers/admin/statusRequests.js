@@ -15,9 +15,9 @@ exports.requestIdSchema = zod_1.z.object({
         id: zod_1.z.string({ required_error: "ID is required in parameters" }).uuid("Invalid ID format"),
     }),
     body: zod_1.z.object({
-        name: zod_1.z.enum(["approve", "reject"], {
-            required_error: "Action name is required",
-            invalid_type_error: "Name must be either 'approve' or 'reject'",
+        status: zod_1.z.enum(["approve", "reject"], {
+            required_error: "Action status is required",
+            invalid_type_error: "Status must be either 'approve' or 'reject'",
         }),
     }),
 });
@@ -143,7 +143,7 @@ exports.getHistoryRequest = getHistoryRequest;
 const changeStatus = async (req, res) => {
     const validated = await exports.requestIdSchema.parseAsync({ params: req.params, body: req.body });
     const id = validated.params.id;
-    const status = validated.body.name; // القيمة إما 'approve' أو 'reject'
+    const status = validated.body.status; // القيمة إما 'approve' أو 'reject'
     await db_1.db.update(schema_1.statusRequest)
         .set({ status })
         .where((0, drizzle_orm_1.eq)(schema_1.statusRequest.id, id));
