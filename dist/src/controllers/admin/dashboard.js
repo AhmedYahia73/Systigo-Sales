@@ -43,10 +43,27 @@ const viewDashboard = async (req, res) => {
         const toMonth = toDate.getMonth() + 1;
         targetDateConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.lt)(schema_1.target_items.year, toYear), (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.target_items.year, toYear), (0, drizzle_orm_1.lte)(schema_1.target_items.month, toMonth))));
     }
-    // 2. بناء شروط الـ Join لجدول الزيارات وحالاتها
+    // 1. جلب معرفات المبيعات التابعين للقائد
+    const salesList = await db_1.db
+        .select({ id: schema_1.users.id })
+        .from(schema_1.users)
+        .where((0, drizzle_orm_1.eq)(schema_1.users.leader_id, userId));
+    // استخراج الـ IDs في مصفوفة بسيطة [1, 2, 3]
+    const sales_ids = salesList.map((item) => item.id);
+    // 2. بناء شروط الـ Join / Filtering
     const joinConditions = [(0, drizzle_orm_1.eq)(schema_1.visits.status_id, schema_1.visitStatus.id)];
     if (role === "sales") {
         joinConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, userId));
+    }
+    else if (role === "leader") {
+        // استخدام inArray شرط أساسي إذا كانت القيمة Array
+        if (sales_ids.length > 0) {
+            joinConditions.push((0, drizzle_orm_1.inArray)(schema_1.visits.sales_id, sales_ids));
+        }
+        else {
+            // في حالة عدم وجود مبيعات تابعين للقائد، يمكنك إضافة شرط يمنع جلب بيانات خاطئة
+            joinConditions.push((0, drizzle_orm_1.sql) `1 = 0`);
+        }
     }
     if (visitDateConditions.length > 0) {
         joinConditions.push(...visitDateConditions);
@@ -66,6 +83,16 @@ const viewDashboard = async (req, res) => {
     const visitsWhereConditions = [];
     if (role === "sales") {
         visitsWhereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, userId));
+    }
+    else if (role === "leader") {
+        // استخدام inArray شرط أساسي إذا كانت القيمة Array
+        if (sales_ids.length > 0) {
+            visitsWhereConditions.push((0, drizzle_orm_1.inArray)(schema_1.visits.sales_id, sales_ids));
+        }
+        else {
+            // في حالة عدم وجود مبيعات تابعين للقائد، يمكنك إضافة شرط يمنع جلب بيانات خاطئة
+            visitsWhereConditions.push((0, drizzle_orm_1.sql) `1 = 0`);
+        }
     }
     if (visitDateConditions.length > 0) {
         visitsWhereConditions.push(...visitDateConditions);

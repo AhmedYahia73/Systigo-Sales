@@ -72,7 +72,7 @@ const router = (0, express_1.Router)();
  *       403:
  *         description: Forbidden
  */
-router.get("/", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(wishlist_1.getAllWishLists));
+router.get("/", (0, checkpermission_1.checkAdminLeaderSales)(), (0, catchAsync_1.catchAsync)(wishlist_1.getAllWishLists));
 /**
  * @swagger
  * /api/admin/wish_list/{id}:

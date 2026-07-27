@@ -178,6 +178,7 @@ export const getAllVisits = async (req: Request, res: Response) => {
             status: visits.status,
             visit_status: visitStatus.name,
             status_id: visits.status_id,
+            sales_id: users.id,
             sales: users.name,
             sales_phone: users.phone,
             createdAt: visits.createdAt
@@ -326,6 +327,7 @@ export const getAllSales = async (req: Request, res: Response) => {
             status: visits.status,
             visit_status: visitStatus.name,
             status_id: visits.status_id,
+            sales_id: users.id,
             sales: users.name,
             sales_phone: users.phone,
             createdAt: visits.createdAt
@@ -484,19 +486,40 @@ export const lists = async (req: Request, res: Response) => {
         .from(visitStatus)
         .where(eq(visitStatus.status, true));  
     const userId = req.user?.id;
-    const sales = await db
-        .select({ 
-            id: users.id,
-            name: users.name,
-            phone: users.phone,
-            })
+  // 1. تحديد نوع البيانات المتوقع من الاستعلام
+type SalesUser = {
+  id: typeof users.$inferSelect.id;
+  name: typeof users.$inferSelect.name;
+  phone: typeof users.$inferSelect.phone;
+};
+
+    // 2. تعريف المتغير بالنوع الصحيح
+    let sales: SalesUser[] = [];
+ 
+
+    if (req.user?.role === "leader" && userId) {
+    sales = await db
+        .select({
+        id: users.id,
+        name: users.name,
+        phone: users.phone,
+        })
         .from(users)
         .where(
-            or(
-                and(eq(users.leader_id, userId!), eq(users.role, "sales")), 
-                eq(users.id, userId!)
-            )
+        or(
+            and(eq(users.leader_id, userId), eq(users.role, "sales")),
+            eq(users.id, userId)
+        )
         );
+    } else {
+    sales = await db
+        .select({
+        id: users.id,
+        name: users.name,
+        phone: users.phone,
+        })
+        .from(users);
+    }
     SuccessResponse(res, { visit_status, sales }, 200);
 }; 
 
