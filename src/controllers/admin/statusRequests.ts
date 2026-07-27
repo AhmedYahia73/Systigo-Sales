@@ -175,9 +175,27 @@ export const changeStatus = async (req: Request, res: Response) => {
     const id = validated.params.id;
     const status = validated.body.status; // القيمة إما 'approve' أو 'reject'
 
+    const existRequest = await db.select({
+        id: statusRequest.id,
+        from: statusRequest.from,
+        to: statusRequest.to,
+        visitId: statusRequest.visitId,
+    })
+    .from(statusRequest)
+    .where(eq(statusRequest.id, id))
+    .limit(1);
+    if (!existRequest.length) {
+        throw new NotFound("Request not found");
+    }
+
     await db.update(statusRequest)
         .set({ status })
         .where(eq(statusRequest.id, id));
+    if(status === "approve") { 
+        await db.update(visits)
+        .set({status : existRequest[0].to})
+        .where(eq(visits.id, existRequest[0].visitId));
+    }
 
     SuccessResponse(res, { message: "Status updated successfully" }, 200);
 };
