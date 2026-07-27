@@ -91,7 +91,7 @@ export const getAllSales = async (req: Request, res: Response) => {
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.max(1, parseInt(req.query.limit as string) || 10);
     const search = (req.query.search as string) || '';
-    const leaderIdParam = req.query.leader_id ? req.query.leader_id : null;
+    const leaderIdParam = req.query.leader_id ? req.query.leader_id as string: null;
     
     const offset = (page - 1) * limit;
 
@@ -115,7 +115,7 @@ export const getAllSales = async (req: Request, res: Response) => {
 
         // إذا الأدمن مرر leader_id محدد في الـ Query
         if (leaderIdParam) {
-            whereConditions.push(eq(users.leader_id, userId!));
+            whereConditions.push(eq(users.leader_id, leaderIdParam!));
         }
     }
 
