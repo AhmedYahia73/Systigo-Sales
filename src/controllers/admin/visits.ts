@@ -79,26 +79,25 @@ export const VisitIdSchema = z.object({
 // ==========================================
 
 // ✅ Get All Visitsexport 
-export const getAllVisits = async (req: Request, res: Response) => {  
+export const getAllVisits = async (req: Request, res: Response) => { 
     const userRole = req.user?.role;
     const userId = req.user?.id;
     const querySalesId = req.query.sales_id as string;
 
-    // استقبال معايير الـ Pagination والبحث
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const search = (req.query.search as string) || '';
     
-    // استقبال معايير فلترة التاريخ (صيغة المتوقع: YYYY-MM-DD)
-    const fromDateStr = req.query.from as string; // مثلاً: 2026-05-05
-    const toDateStr = req.query.to as string;     // مثلاً: 2026-05-05
+    const fromDateStr = req.query.from as string;
+    const toDateStr = req.query.to as string; 
 
     const offset = (page - 1) * limit;
 
     let whereConditions: SQL[] = [];
 
     whereConditions.push(eq(visits.status, "visit"));
-    // 1. تطبيق الصلاحيات والفلترة الذكية لـ Drizzle
+
+    // 1. الصلاحيات
     if (userRole === "admin") {
         if (querySalesId) {
             whereConditions.push(eq(visits.sales_id, querySalesId));
@@ -135,22 +134,21 @@ export const getAllVisits = async (req: Request, res: Response) => {
         throw new BadRequest("Unauthorized role");
     }
 
-    // 2. تطبيق البحث (Search) بناءً على الاسم، الإيميل، أو الهاتف
-    if (search) {
-        const searchPattern = `%${search}%`;
+    // 2. البحث (Search) - تأكد من استخدام ilike بالشكل الصحيح
+    if (search.trim()) {
+        const searchPattern = `%${search.trim()}%`;
         whereConditions.push(
             or(
-                ilike(visits.name, searchPattern),         // اسم العميل/الزيارة
-                ilike(visits.phone, searchPattern),        // هاتف العميل/الزيارة
-                ilike(users.name, searchPattern),          // اسم المندوب
-                ilike(users.email, searchPattern),         // إيميل المندوب
-                ilike(users.phone, searchPattern)          // هاتف المندوب
+                ilike(visits.name, searchPattern),
+                ilike(visits.phone, searchPattern),
+                ilike(users.name, searchPattern),
+                ilike(users.email, searchPattern),
+                ilike(users.phone, searchPattern)
             ) as SQL
         );
     }
 
-    // 3. تطبيق الفلترة بالتاريخ بدون وقت (Date-only filter)
-    // نستخدم الكائنات الافتراضية للوقت للتأكد من جلب اليوم كاملاً (من 00:00:00 إلى 23:59:59)
+    // 3. الفلترة بالتاريخ
     if (fromDateStr) {
         const fromDate = new Date(`${fromDateStr}T00:00:00.000Z`);
         if (!isNaN(fromDate.getTime())) {
@@ -165,8 +163,11 @@ export const getAllVisits = async (req: Request, res: Response) => {
         }
     }
 
-    // 4. بناء الاستعلام الأساسي (Base Query)
-    let baseQuery = db
+    // دمج الشروط بمعامل and() واحد رئيسي
+    const finalWhereCondition = and(...whereConditions);
+
+    // 4. استعلام البيانات (Base Query)
+    const allVisitsRaw = await db
         .select({
             id: visits.id, 
             lat: visits.lat,
@@ -186,43 +187,33 @@ export const getAllVisits = async (req: Request, res: Response) => {
         .from(visits)
         .leftJoin(users, eq(visits.sales_id, users.id))
         .leftJoin(visitStatus, eq(visits.status_id, visitStatus.id))
+        .where(finalWhereCondition)
         .orderBy(desc(visits.createdAt))
-        .$dynamic();
+        .limit(limit)
+        .offset(offset);
 
-    // 5. استعلام لحساب العدد الإجمالي متوافق مع الفلاتر (Count Query)
-    let countQuery = db
+    // 5. استعلام العد الإجمالي (Count Query) - هام جداً ليعمل الـ Pagination صح مع البحث
+    const totalCountResult = await db
         .select({ total: count() })
         .from(visits)
         .leftJoin(users, eq(visits.sales_id, users.id))
         .leftJoin(visitStatus, eq(visits.status_id, visitStatus.id))
-        .$dynamic();
+        .where(finalWhereCondition);
 
-    // ربط الشروط بالاستعلامات
-    if (whereConditions.length > 0) {
-        baseQuery = baseQuery.where(and(...whereConditions));
-        countQuery = countQuery.where(and(...whereConditions));
-    }
+    const totalCount = totalCountResult[0]?.total || 0;
 
-    // تنفيذ الاستعلامين معاً بالتوازي لتحسين الأداء
-    const [allVisitsRaw, [{ total: totalCount }]] = await Promise.all([
-        baseQuery.limit(limit).offset(offset),
-        countQuery
-    ]);
-
-    // إضافة رابط الخريطة تلقائياً لكل زيارة
     const allVisits = allVisitsRaw.map((visit) => ({
         ...visit,
         map_link: `https://www.google.com/maps/search/?api=1&query=${visit.lat},${visit.lng}`
     }));
 
-    // إرسال النتيجة مع معلومات الـ pagination الكاملة
     SuccessResponse(res, { 
         allVisits,
         pagination: {
             total: totalCount,
             page,
             limit,
-            totalPages: Math.ceil(totalCount / limit)
+            totalPages: Math.ceil(totalCount / limit) || 1
         }
     }, 200);
 };
