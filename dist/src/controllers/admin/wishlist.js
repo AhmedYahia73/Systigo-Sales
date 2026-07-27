@@ -51,7 +51,7 @@ const getAllWishLists = async (req, res) => {
     // 1. تطبيق البحث (Search) باسم قائمة الأمنيات أو وصفها
     if (search) {
         const searchPattern = `%${search}%`;
-        whereConditions.push((0, drizzle_orm_2.or)((0, drizzle_orm_2.ilike)(schema_1.wishList.name, searchPattern), (0, drizzle_orm_2.ilike)(schema_1.wishList.description, searchPattern)));
+        whereConditions.push((0, drizzle_orm_2.or)((0, drizzle_orm_2.like)(schema_1.wishList.name, searchPattern), (0, drizzle_orm_2.like)(schema_1.wishList.description, searchPattern)));
     }
     // 2. بناء استعلام البيانات الأساسي (Base Query)
     let query = db_1.db

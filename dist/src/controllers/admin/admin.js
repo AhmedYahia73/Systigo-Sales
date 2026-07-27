@@ -75,7 +75,7 @@ const getAllAdmin = async (req, res) => {
     // 2. تطبيق البحث (Search) بالاسم، الهاتف، أو البريد الإلكتروني للمشرفين
     if (search) {
         const searchPattern = `%${search}%`;
-        whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.ilike)(schema_1.users.name, searchPattern), (0, drizzle_orm_1.ilike)(schema_1.users.phone, searchPattern), (0, drizzle_orm_1.ilike)(schema_1.users.email, searchPattern)));
+        whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.like)(schema_1.users.name, searchPattern), (0, drizzle_orm_1.like)(schema_1.users.phone, searchPattern), (0, drizzle_orm_1.like)(schema_1.users.email, searchPattern)));
     }
     // 3. بناء استعلام البيانات الأساسي (Base Query)
     let query = db_1.db

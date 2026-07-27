@@ -121,11 +121,11 @@ const getAllVisits = async (req, res) => {
     // 2. تطبيق البحث (Search) بناءً على الاسم، الإيميل، أو الهاتف
     if (search) {
         const searchPattern = `%${search}%`;
-        whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.ilike)(schema_1.visits.name, searchPattern), // اسم العميل/الزيارة
-        (0, drizzle_orm_1.ilike)(schema_1.visits.phone, searchPattern), // هاتف العميل/الزيارة
-        (0, drizzle_orm_1.ilike)(schema_1.users.name, searchPattern), // اسم المندوب
-        (0, drizzle_orm_1.ilike)(schema_1.users.email, searchPattern), // إيميل المندوب
-        (0, drizzle_orm_1.ilike)(schema_1.users.phone, searchPattern) // هاتف المندوب
+        whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.like)(schema_1.visits.name, searchPattern), // اسم العميل/الزيارة
+        (0, drizzle_orm_1.like)(schema_1.visits.phone, searchPattern), // هاتف العميل/الزيارة
+        (0, drizzle_orm_1.like)(schema_1.users.name, searchPattern), // اسم المندوب
+        (0, drizzle_orm_1.like)(schema_1.users.email, searchPattern), // إيميل المندوب
+        (0, drizzle_orm_1.like)(schema_1.users.phone, searchPattern) // هاتف المندوب
         ));
     }
     // 3. تطبيق الفلترة بالتاريخ بدون وقت (Date-only filter)
@@ -252,11 +252,11 @@ const getAllSales = async (req, res) => {
     // 2. تطبيق البحث (Search) بناءً على الاسم، الإيميل، أو الهاتف
     if (search) {
         const searchPattern = `%${search}%`;
-        whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.ilike)(schema_1.visits.name, searchPattern), // اسم العميل/الزيارة
-        (0, drizzle_orm_1.ilike)(schema_1.visits.phone, searchPattern), // هاتف العميل/الزيارة
-        (0, drizzle_orm_1.ilike)(schema_1.users.name, searchPattern), // اسم المندوب
-        (0, drizzle_orm_1.ilike)(schema_1.users.email, searchPattern), // إيميل المندوب
-        (0, drizzle_orm_1.ilike)(schema_1.users.phone, searchPattern) // هاتف المندوب
+        whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.like)(schema_1.visits.name, searchPattern), // اسم العميل/الزيارة
+        (0, drizzle_orm_1.like)(schema_1.visits.phone, searchPattern), // هاتف العميل/الزيارة
+        (0, drizzle_orm_1.like)(schema_1.users.name, searchPattern), // اسم المندوب
+        (0, drizzle_orm_1.like)(schema_1.users.email, searchPattern), // إيميل المندوب
+        (0, drizzle_orm_1.like)(schema_1.users.phone, searchPattern) // هاتف المندوب
         ));
     }
     // 3. تطبيق الفلترة بالتاريخ بدون وقت (Date-only filter)
@@ -377,7 +377,7 @@ const getVisitsCounts = async (req, res) => {
     // 2. تطبيق البحث (Search)
     if (search) {
         const searchPattern = `%${search}%`;
-        whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.ilike)(schema_1.visits.name, searchPattern), (0, drizzle_orm_1.ilike)(schema_1.visits.phone, searchPattern), (0, drizzle_orm_1.ilike)(schema_1.users.name, searchPattern), (0, drizzle_orm_1.ilike)(schema_1.users.email, searchPattern), (0, drizzle_orm_1.ilike)(schema_1.users.phone, searchPattern)));
+        whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.like)(schema_1.visits.name, searchPattern), (0, drizzle_orm_1.like)(schema_1.visits.phone, searchPattern), (0, drizzle_orm_1.like)(schema_1.users.name, searchPattern), (0, drizzle_orm_1.like)(schema_1.users.email, searchPattern), (0, drizzle_orm_1.like)(schema_1.users.phone, searchPattern)));
     }
     // 3. تطبيق الفلترة بالتاريخ
     if (fromDateStr) {

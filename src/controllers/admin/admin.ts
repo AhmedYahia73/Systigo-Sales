@@ -3,7 +3,7 @@
 import { Request, Response } from "express";
 import { db } from "../../models/db";
 import { users } from "../../models/schema"; 
-import { SQL, and, or, eq, ilike, count, desc, ne } from 'drizzle-orm';
+import { SQL, and, or, eq, like, count, desc, ne } from 'drizzle-orm';
 import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound";
 import { BadRequest } from "../../Errors/BadRequest";
@@ -90,9 +90,9 @@ export const getAllAdmin = async (req: Request, res: Response) => {
         const searchPattern = `%${search}%`;
         whereConditions.push(
             or(
-                ilike(users.name, searchPattern),
-                ilike(users.phone, searchPattern),
-                ilike(users.email, searchPattern)
+                like(users.name, searchPattern),
+                like(users.phone, searchPattern),
+                like(users.email, searchPattern)
             ) as SQL
         );
     }

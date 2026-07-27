@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound";
 import { z } from "zod"; 
-import { SQL, and, or, ilike, count, desc } from 'drizzle-orm';
+import { SQL, and, or, like, count, desc } from 'drizzle-orm';
 // ==========================================
 // 🛡️ Zod Validation Schemas
 // ==========================================
@@ -62,8 +62,8 @@ export const getAllWishLists = async (req: Request, res: Response) => {
         const searchPattern = `%${search}%`;
         whereConditions.push(
             or(
-                ilike(wishList.name, searchPattern),
-                ilike(wishList.description, searchPattern)
+                like(wishList.name, searchPattern),
+                like(wishList.description, searchPattern)
             ) as SQL
         );
     }

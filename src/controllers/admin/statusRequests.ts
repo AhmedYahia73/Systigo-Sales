@@ -6,7 +6,7 @@ import { statusRequest, visits, users } from "../../models/schema";
 import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound";
 import { z } from "zod"; 
-import { eq, desc, or, ilike, count, and, ne } from 'drizzle-orm';
+import { eq, desc, or, like, count, and, ne } from 'drizzle-orm';
 
 // ==========================================
 // 🛡️ Zod Validation Schemas
@@ -46,9 +46,9 @@ export const getPendingRequest = async (req: Request, res: Response) => {
 
     const searchCondition = search
         ? or(
-            ilike(users.name, `%${search}%`),
-            ilike(users.phone, `%${search}%`),
-            ilike(visits.name, `%${search}%`)
+            like(users.name, `%${search}%`),
+            like(users.phone, `%${search}%`),
+            like(visits.name, `%${search}%`)
           )
         : undefined;
 
@@ -117,9 +117,9 @@ export const getHistoryRequest = async (req: Request, res: Response) => {
 
     const searchCondition = search
         ? or(
-            ilike(users.name, `%${search}%`),
-            ilike(users.phone, `%${search}%`),
-            ilike(visits.name, `%${search}%`)
+            like(users.name, `%${search}%`),
+            like(users.phone, `%${search}%`),
+            like(visits.name, `%${search}%`)
           )
         : undefined;
 

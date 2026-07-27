@@ -37,7 +37,7 @@ const getPendingRequest = async (req, res) => {
         ? (0, drizzle_orm_1.eq)(schema_1.users.leader_id, req.user?.id)
         : undefined;
     const searchCondition = search
-        ? (0, drizzle_orm_1.or)((0, drizzle_orm_1.ilike)(schema_1.users.name, `%${search}%`), (0, drizzle_orm_1.ilike)(schema_1.users.phone, `%${search}%`), (0, drizzle_orm_1.ilike)(schema_1.visits.name, `%${search}%`))
+        ? (0, drizzle_orm_1.or)((0, drizzle_orm_1.like)(schema_1.users.name, `%${search}%`), (0, drizzle_orm_1.like)(schema_1.users.phone, `%${search}%`), (0, drizzle_orm_1.like)(schema_1.visits.name, `%${search}%`))
         : undefined;
     // دمج الشروط تلقائياً (تتجاهل Drizzle القيم الـ undefined)
     const whereClause = (0, drizzle_orm_1.and)(baseCondition, leaderCondition, searchCondition);
@@ -95,7 +95,7 @@ const getHistoryRequest = async (req, res) => {
         ? (0, drizzle_orm_1.eq)(schema_1.users.leader_id, req.user?.id)
         : undefined;
     const searchCondition = search
-        ? (0, drizzle_orm_1.or)((0, drizzle_orm_1.ilike)(schema_1.users.name, `%${search}%`), (0, drizzle_orm_1.ilike)(schema_1.users.phone, `%${search}%`), (0, drizzle_orm_1.ilike)(schema_1.visits.name, `%${search}%`))
+        ? (0, drizzle_orm_1.or)((0, drizzle_orm_1.like)(schema_1.users.name, `%${search}%`), (0, drizzle_orm_1.like)(schema_1.users.phone, `%${search}%`), (0, drizzle_orm_1.like)(schema_1.visits.name, `%${search}%`))
         : undefined;
     const whereClause = (0, drizzle_orm_1.and)(baseCondition, leaderCondition, searchCondition);
     // 3. استعلام جلب البيانات التاريخية

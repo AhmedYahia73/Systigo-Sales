@@ -10,7 +10,7 @@ import bcrypt from "bcrypt";
 import { saveBase64Image } from "../../utils/handleImages";
 import { deletePhotoFromServer } from "../../utils/deleteImage";
 import { z } from "zod";
-import { SQL, and, or, eq, ilike, count, desc, ne} from 'drizzle-orm';
+import { SQL, and, or, eq, like, count, desc, ne} from 'drizzle-orm';
 // ==========================================
 // 🛡️ Zod Validation Schemas
 // ==========================================
@@ -120,9 +120,9 @@ export const getAllSales = async (req: Request, res: Response) => {
         const searchPattern = `%${search}%`;
         whereConditions.push(
             or(
-                ilike(users.name, searchPattern),
-                ilike(users.phone, searchPattern),
-                ilike(users.email, searchPattern)
+                like(users.name, searchPattern),
+                like(users.phone, searchPattern),
+                like(users.email, searchPattern)
             ) as SQL
         );
     }

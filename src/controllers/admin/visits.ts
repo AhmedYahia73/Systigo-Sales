@@ -5,7 +5,7 @@ import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound";
 import { BadRequest } from "../../Errors/BadRequest";
 import { string, z } from "zod";
-import { SQL, and, or, eq, ilike, inArray, count, gte, lte, desc, ne, sql } from 'drizzle-orm';
+import { SQL, and, or, eq, like, inArray, count, gte, lte, desc, ne, sql } from 'drizzle-orm';
 // ==========================================
 // 🛡️ Zod Validation Schemas
 // ==========================================
@@ -79,25 +79,26 @@ export const VisitIdSchema = z.object({
 // ==========================================
 
 // ✅ Get All Visitsexport 
-export const getAllVisits = async (req: Request, res: Response) => { 
+export const getAllVisits = async (req: Request, res: Response) => {  
     const userRole = req.user?.role;
     const userId = req.user?.id;
     const querySalesId = req.query.sales_id as string;
 
+    // استقبال معايير الـ Pagination والبحث
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const search = (req.query.search as string) || '';
     
-    const fromDateStr = req.query.from as string;
-    const toDateStr = req.query.to as string; 
+    // استقبال معايير فلترة التاريخ (صيغة المتوقع: YYYY-MM-DD)
+    const fromDateStr = req.query.from as string; // مثلاً: 2026-05-05
+    const toDateStr = req.query.to as string;     // مثلاً: 2026-05-05
 
     const offset = (page - 1) * limit;
 
     let whereConditions: SQL[] = [];
 
     whereConditions.push(eq(visits.status, "visit"));
-
-    // 1. الصلاحيات
+    // 1. تطبيق الصلاحيات والفلترة الذكية لـ Drizzle
     if (userRole === "admin") {
         if (querySalesId) {
             whereConditions.push(eq(visits.sales_id, querySalesId));
@@ -134,21 +135,22 @@ export const getAllVisits = async (req: Request, res: Response) => {
         throw new BadRequest("Unauthorized role");
     }
 
-    // 2. البحث (Search) - تأكد من استخدام ilike بالشكل الصحيح
-    if (search.trim()) {
-        const searchPattern = `%${search.trim()}%`;
+    // 2. تطبيق البحث (Search) بناءً على الاسم، الإيميل، أو الهاتف
+    if (search) {
+        const searchPattern = `%${search}%`;
         whereConditions.push(
             or(
-                ilike(visits.name, searchPattern),
-                ilike(visits.phone, searchPattern),
-                ilike(users.name, searchPattern),
-                ilike(users.email, searchPattern),
-                ilike(users.phone, searchPattern)
+                like(visits.name, searchPattern),         // اسم العميل/الزيارة
+                like(visits.phone, searchPattern),        // هاتف العميل/الزيارة
+                like(users.name, searchPattern),          // اسم المندوب
+                like(users.email, searchPattern),         // إيميل المندوب
+                like(users.phone, searchPattern)          // هاتف المندوب
             ) as SQL
         );
     }
 
-    // 3. الفلترة بالتاريخ
+    // 3. تطبيق الفلترة بالتاريخ بدون وقت (Date-only filter)
+    // نستخدم الكائنات الافتراضية للوقت للتأكد من جلب اليوم كاملاً (من 00:00:00 إلى 23:59:59)
     if (fromDateStr) {
         const fromDate = new Date(`${fromDateStr}T00:00:00.000Z`);
         if (!isNaN(fromDate.getTime())) {
@@ -163,11 +165,8 @@ export const getAllVisits = async (req: Request, res: Response) => {
         }
     }
 
-    // دمج الشروط بمعامل and() واحد رئيسي
-    const finalWhereCondition = and(...whereConditions);
-
-    // 4. استعلام البيانات (Base Query)
-    const allVisitsRaw = await db
+    // 4. بناء الاستعلام الأساسي (Base Query)
+    let baseQuery = db
         .select({
             id: visits.id, 
             lat: visits.lat,
@@ -187,33 +186,43 @@ export const getAllVisits = async (req: Request, res: Response) => {
         .from(visits)
         .leftJoin(users, eq(visits.sales_id, users.id))
         .leftJoin(visitStatus, eq(visits.status_id, visitStatus.id))
-        .where(finalWhereCondition)
         .orderBy(desc(visits.createdAt))
-        .limit(limit)
-        .offset(offset);
+        .$dynamic();
 
-    // 5. استعلام العد الإجمالي (Count Query) - هام جداً ليعمل الـ Pagination صح مع البحث
-    const totalCountResult = await db
+    // 5. استعلام لحساب العدد الإجمالي متوافق مع الفلاتر (Count Query)
+    let countQuery = db
         .select({ total: count() })
         .from(visits)
         .leftJoin(users, eq(visits.sales_id, users.id))
         .leftJoin(visitStatus, eq(visits.status_id, visitStatus.id))
-        .where(finalWhereCondition);
+        .$dynamic();
 
-    const totalCount = totalCountResult[0]?.total || 0;
+    // ربط الشروط بالاستعلامات
+    if (whereConditions.length > 0) {
+        baseQuery = baseQuery.where(and(...whereConditions));
+        countQuery = countQuery.where(and(...whereConditions));
+    }
 
+    // تنفيذ الاستعلامين معاً بالتوازي لتحسين الأداء
+    const [allVisitsRaw, [{ total: totalCount }]] = await Promise.all([
+        baseQuery.limit(limit).offset(offset),
+        countQuery
+    ]);
+
+    // إضافة رابط الخريطة تلقائياً لكل زيارة
     const allVisits = allVisitsRaw.map((visit) => ({
         ...visit,
         map_link: `https://www.google.com/maps/search/?api=1&query=${visit.lat},${visit.lng}`
     }));
 
+    // إرسال النتيجة مع معلومات الـ pagination الكاملة
     SuccessResponse(res, { 
         allVisits,
         pagination: {
             total: totalCount,
             page,
             limit,
-            totalPages: Math.ceil(totalCount / limit) || 1
+            totalPages: Math.ceil(totalCount / limit)
         }
     }, 200);
 };
@@ -280,11 +289,11 @@ export const getAllSales = async (req: Request, res: Response) => {
         const searchPattern = `%${search}%`;
         whereConditions.push(
             or(
-                ilike(visits.name, searchPattern),         // اسم العميل/الزيارة
-                ilike(visits.phone, searchPattern),        // هاتف العميل/الزيارة
-                ilike(users.name, searchPattern),          // اسم المندوب
-                ilike(users.email, searchPattern),         // إيميل المندوب
-                ilike(users.phone, searchPattern)          // هاتف المندوب
+                like(visits.name, searchPattern),         // اسم العميل/الزيارة
+                like(visits.phone, searchPattern),        // هاتف العميل/الزيارة
+                like(users.name, searchPattern),          // اسم المندوب
+                like(users.email, searchPattern),         // إيميل المندوب
+                like(users.phone, searchPattern)          // هاتف المندوب
             ) as SQL
         );
     }
@@ -421,11 +430,11 @@ export const getVisitsCounts = async (req: Request, res: Response) => {
         const searchPattern = `%${search}%`;
         whereConditions.push(
             or(
-                ilike(visits.name, searchPattern),
-                ilike(visits.phone, searchPattern),
-                ilike(users.name, searchPattern),
-                ilike(users.email, searchPattern),
-                ilike(users.phone, searchPattern)
+                like(visits.name, searchPattern),
+                like(visits.phone, searchPattern),
+                like(users.name, searchPattern),
+                like(users.email, searchPattern),
+                like(users.phone, searchPattern)
             ) as SQL
         );
     }
