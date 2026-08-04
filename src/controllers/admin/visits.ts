@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { db } from "../../models/db";
-import { users, visits, visitStatus, statusRequest } from "../../models/schema"; 
+import { users, visits, visitStatus, statusRequest, wishList } from "../../models/schema"; 
 import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound";
 import { BadRequest } from "../../Errors/BadRequest";
@@ -467,12 +467,19 @@ export const getVisitsCounts = async (req: Request, res: Response) => {
 
     const visitCount = Number(countsResult?.visitCount || 0);
     const notVisitCount = Number(countsResult?.notVisitCount || 0);
-
+    const wishListsCount = (
+        await db
+            .select({
+                id: wishList.id
+            })
+            .from(wishList)
+    ).length;
     // 5. إرسال الأعداد فقط في الاستجابة
     SuccessResponse(res, { 
         visitCount,        // عدد الزيارات التي حالتها تساوي "visit"
         salesCount: notVisitCount,     // عدد الزيارات التي حالتها لا تساوي "visit"
-        total: visitCount + notVisitCount // الإجمالي
+        total: visitCount + notVisitCount, // الإجمالي
+        wishListsCount
     }, 200);
 };
 
