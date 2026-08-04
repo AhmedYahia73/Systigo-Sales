@@ -77,38 +77,41 @@ exports.salesIdSchema = zod_1.z.object({
 const getAllSales = async (req, res) => {
     const userRole = req.user?.role;
     const userId = req.user?.id;
-    // استقبال معايير الـ Pagination والبحث
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    // 1. استقبال معايير الـ Pagination والبحث والفلترة
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 10);
     const search = req.query.search || '';
+    const leaderIdParam = req.query.leader_id ? req.query.leader_id : null;
     const offset = (page - 1) * limit;
-    // جلب قائد الفريق الآخر بربط ذاتي (Self Join) لعرض بيانات الـ Leader
-    const leaderAlias = db_1.db.$with("leaderAlias").as(db_1.db.select().from(schema_1.users));
-    let whereConditions = [];
-    // 1. تطبيق الصلاحيات والفلترة الذكية بناءً على الـ Role
+    // 2. عمل Alias لجدول الـ users لعرض بيانات الـ Leader (Self-Join)
+    const leaderAlias = (0, drizzle_orm_1.aliasedTable)(schema_1.users, "leaderAlias");
+    const whereConditions = [];
+    // 3. تطبيق الصلاحيات والفلترة بناءً على الـ Role
     if (userRole === "leader") {
-        // إذا كان الفاعل قائد فريق، نُظهر له فقط الـ Sales التابعين له
+        // قائد الفريق يشوف فقط الـ Sales التابعين له
         whereConditions.push((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.role, "sales"), (0, drizzle_orm_1.eq)(schema_1.users.leader_id, userId)));
     }
     else {
-        // للأدمن أو الأونر نُظهر جميع الـ Sales
+        // الأدمن أو الأونر يشوف جميع الـ Sales
         whereConditions.push((0, drizzle_orm_1.eq)(schema_1.users.role, "sales"));
+        // إذا الأدمن مرر leader_id محدد في الـ Query
+        if (leaderIdParam) {
+            whereConditions.push((0, drizzle_orm_1.eq)(schema_1.users.leader_id, leaderIdParam));
+        }
     }
-    // 2. تطبيق البحث (Search) بالاسم، الهاتف، أو البريد الإلكتروني للـ Sales
-    if (search) {
-        const searchPattern = `%${search}%`;
+    // 4. تطبيق البحث (Search) بالاسم، الهاتف، أو البريد الإلكتروني
+    if (search.trim()) {
+        const searchPattern = `%${search.trim()}%`;
         whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.like)(schema_1.users.name, searchPattern), (0, drizzle_orm_1.like)(schema_1.users.phone, searchPattern), (0, drizzle_orm_1.like)(schema_1.users.email, searchPattern)));
     }
-    // 3. بناء استعلام البيانات الأساسي (Base Query)
+    // 5. بناء استعلام البيانات الأساسي (Base Query)
     let query = db_1.db
-        .with(leaderAlias)
         .select({
         id: schema_1.users.id,
         name: schema_1.users.name,
         email: schema_1.users.email,
         phone: schema_1.users.phone,
         image: schema_1.users.image,
-        target: schema_1.targets.name,
         target_name: schema_1.targets.name,
         leader_name: leaderAlias.name,
         leader_phone: leaderAlias.phone,
@@ -118,31 +121,32 @@ const getAllSales = async (req, res) => {
         .from(schema_1.users)
         .leftJoin(schema_1.targets, (0, drizzle_orm_1.eq)(schema_1.users.target_id, schema_1.targets.id))
         .leftJoin(leaderAlias, (0, drizzle_orm_1.eq)(schema_1.users.leader_id, leaderAlias.id))
-        .orderBy((0, drizzle_orm_1.desc)(schema_1.users.createdAt)) // ترتيب الأحدث أولاً
+        .orderBy((0, drizzle_orm_1.desc)(schema_1.users.createdAt))
         .$dynamic();
-    // 4. بناء استعلام الـ Count لحساب العدد الإجمالي متوافقاً مع فلاتر البحث والصلاحيات
+    // 6. بناء استعلام الـ Count لحساب التوتال
     let countQuery = db_1.db
         .select({ total: (0, drizzle_orm_1.count)() })
         .from(schema_1.users)
         .$dynamic();
-    // ربط الشروط بالاستعلامات
+    // ربط الشروط بالاستعلامين
     if (whereConditions.length > 0) {
-        query = query.where((0, drizzle_orm_1.and)(...whereConditions));
-        countQuery = countQuery.where((0, drizzle_orm_1.and)(...whereConditions));
+        const finalWhere = (0, drizzle_orm_1.and)(...whereConditions);
+        query = query.where(finalWhere);
+        countQuery = countQuery.where(finalWhere);
     }
-    // 5. تنفيذ الاستعلامين بالتوازي (Parallel Execution) لضمان أعلى أداء
+    // 7. تنفيذ الاستعلامين بالتوازي (Parallel Execution)
     const [allSales, [{ total: totalCount }]] = await Promise.all([
         query.limit(limit).offset(offset),
         countQuery
     ]);
-    // 6. إرسال النتيجة مع بيانات الـ Pagination كاملة
-    (0, response_1.SuccessResponse)(res, {
+    // 8. إرسال النتيجة
+    return (0, response_1.SuccessResponse)(res, {
         sales: allSales,
         pagination: {
-            total: totalCount,
+            total: Number(totalCount),
             page,
             limit,
-            totalPages: Math.ceil(totalCount / limit)
+            totalPages: Math.ceil(Number(totalCount) / limit)
         }
     }, 200);
 };

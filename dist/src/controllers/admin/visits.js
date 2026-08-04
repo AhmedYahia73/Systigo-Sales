@@ -404,11 +404,17 @@ const getVisitsCounts = async (req, res) => {
         .where(whereConditions.length > 0 ? (0, drizzle_orm_1.and)(...whereConditions) : undefined);
     const visitCount = Number(countsResult?.visitCount || 0);
     const notVisitCount = Number(countsResult?.notVisitCount || 0);
+    const wishListsCount = (await db_1.db
+        .select({
+        id: schema_1.wishList.id
+    })
+        .from(schema_1.wishList)).length;
     // 5. إرسال الأعداد فقط في الاستجابة
     (0, response_1.SuccessResponse)(res, {
         visitCount, // عدد الزيارات التي حالتها تساوي "visit"
         salesCount: notVisitCount, // عدد الزيارات التي حالتها لا تساوي "visit"
-        total: visitCount + notVisitCount // الإجمالي
+        total: visitCount + notVisitCount, // الإجمالي
+        wishListsCount
     }, 200);
 };
 exports.getVisitsCounts = getVisitsCounts;

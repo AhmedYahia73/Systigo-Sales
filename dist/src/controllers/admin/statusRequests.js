@@ -5,6 +5,7 @@ exports.changeStatus = exports.getHistoryRequest = exports.getPendingRequest = e
 const db_1 = require("../../models/db");
 const schema_1 = require("../../models/schema");
 const response_1 = require("../../utils/response");
+const NotFound_1 = require("../../Errors/NotFound");
 const zod_1 = require("zod");
 const drizzle_orm_1 = require("drizzle-orm");
 // ==========================================
@@ -144,9 +145,26 @@ const changeStatus = async (req, res) => {
     const validated = await exports.requestIdSchema.parseAsync({ params: req.params, body: req.body });
     const id = validated.params.id;
     const status = validated.body.status; // القيمة إما 'approve' أو 'reject'
+    const existRequest = await db_1.db.select({
+        id: schema_1.statusRequest.id,
+        from: schema_1.statusRequest.from,
+        to: schema_1.statusRequest.to,
+        visitId: schema_1.statusRequest.visitId,
+    })
+        .from(schema_1.statusRequest)
+        .where((0, drizzle_orm_1.eq)(schema_1.statusRequest.id, id))
+        .limit(1);
+    if (!existRequest.length) {
+        throw new NotFound_1.NotFound("Request not found");
+    }
     await db_1.db.update(schema_1.statusRequest)
         .set({ status })
         .where((0, drizzle_orm_1.eq)(schema_1.statusRequest.id, id));
+    if (status === "approve") {
+        await db_1.db.update(schema_1.visits)
+            .set({ status: existRequest[0].to })
+            .where((0, drizzle_orm_1.eq)(schema_1.visits.id, existRequest[0].visitId));
+    }
     (0, response_1.SuccessResponse)(res, { message: "Status updated successfully" }, 200);
 };
 exports.changeStatus = changeStatus;
