@@ -647,7 +647,7 @@ export const createVisits = async (req: Request, res: Response) => {
     if (validated.body.product_id !== undefined) insertData.product_id = validated.body.product_id;
     if (validated.body.duration !== undefined) insertData.duration = validated.body.duration;
     
-    if (status === "sales" && validated.body.product_id && validated.body.duration && (req.user?.role === "leader" || req.user?.role === "admin")) {
+    if ((status === "sales" || status === "delivered") && validated.body.product_id && validated.body.duration && (req.user?.role === "leader" || req.user?.role === "admin")) {
         const product = await db.select().from(products).where(eq(products.id, validated.body.product_id)).limit(1);
         if (product[0] && Array.isArray(product[0].points)) {
             const pointEntry = product[0].points.find((p: any) => p.duration === validated.body.duration);
@@ -768,7 +768,7 @@ export const updateVisits = async (req: Request, res: Response) => {
             // الأدوار الأخرى (Admin / Leader) -> تغيير مباشر
             updateData.status = status;
             
-            if (status === "sales" && validated.body.product_id && validated.body.duration) {
+            if ((status === "sales" || status === "delivered") && validated.body.product_id && validated.body.duration) {
                 const product = await db.select().from(products).where(eq(products.id, validated.body.product_id)).limit(1);
                 if (product[0] && Array.isArray(product[0].points)) {
                     const pointEntry = product[0].points.find((p: any) => p.duration === validated.body.duration);
