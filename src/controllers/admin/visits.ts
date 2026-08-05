@@ -87,6 +87,7 @@ export const getAllVisits = async (req: Request, res: Response) => {
     const userRole = req.user?.role;
     const userId = req.user?.id;
     const querySalesId = req.query.sales_id as string;
+    const queryStatusId = req.query.status_id as string;
 
     // استقبال معايير الـ Pagination والبحث
     const page = parseInt(req.query.page as string) || 1;
@@ -102,6 +103,10 @@ export const getAllVisits = async (req: Request, res: Response) => {
     let whereConditions: SQL[] = [];
 
     whereConditions.push(eq(visits.status, "visit"));
+    
+    if (queryStatusId) {
+        whereConditions.push(eq(visits.status_id, queryStatusId));
+    }
     // 1. تطبيق الصلاحيات والفلترة الذكية لـ Drizzle
     if (userRole === "admin") {
         if (querySalesId) {
@@ -247,6 +252,7 @@ export const getAllSales = async (req: Request, res: Response) => {
     const userRole = req.user?.role;
     const userId = req.user?.id;
     const querySalesId = req.query.sales_id as string;
+    const queryStatusId = req.query.status_id as string;
 
     // استقبال معايير الـ Pagination والبحث
     const page = parseInt(req.query.page as string) || 1;
@@ -262,6 +268,9 @@ export const getAllSales = async (req: Request, res: Response) => {
     let whereConditions: SQL[] = [];
 
     whereConditions.push(ne(visits.status, "visit"));
+    if (queryStatusId) {
+        whereConditions.push(eq(visits.status_id, queryStatusId));
+    }
     // 1. تطبيق الصلاحيات والفلترة الذكية لـ Drizzle
     if (userRole === "admin") {
         if (querySalesId) {
@@ -406,6 +415,7 @@ export const getVisitsCounts = async (req: Request, res: Response) => {
     const userRole = req.user?.role;
     const userId = req.user?.id;
     const querySalesId = req.query.sales_id as string;
+    const queryStatusId = req.query.status_id as string;
 
     // استقبال معايير البحث والتواريخ
     const search = (req.query.search as string) || '';
@@ -413,6 +423,10 @@ export const getVisitsCounts = async (req: Request, res: Response) => {
     const toDateStr = req.query.to as string;   // مثلاً: 2026-05-05
 
     let whereConditions: SQL[] = [];
+
+    if (queryStatusId) {
+        whereConditions.push(eq(visits.status_id, queryStatusId));
+    }
 
     // 1. تطبيق الصلاحيات والفلترة لـ Drizzle
     if (userRole === "admin") {

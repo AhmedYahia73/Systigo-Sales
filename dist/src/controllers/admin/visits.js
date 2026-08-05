@@ -77,6 +77,7 @@ const getAllVisits = async (req, res) => {
     const userRole = req.user?.role;
     const userId = req.user?.id;
     const querySalesId = req.query.sales_id;
+    const queryStatusId = req.query.status_id;
     // استقبال معايير الـ Pagination والبحث
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -87,6 +88,9 @@ const getAllVisits = async (req, res) => {
     const offset = (page - 1) * limit;
     let whereConditions = [];
     whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.status, "visit"));
+    if (queryStatusId) {
+        whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.status_id, queryStatusId));
+    }
     // 1. تطبيق الصلاحيات والفلترة الذكية لـ Drizzle
     if (userRole === "admin") {
         if (querySalesId) {
@@ -218,6 +222,7 @@ const getAllSales = async (req, res) => {
     const userRole = req.user?.role;
     const userId = req.user?.id;
     const querySalesId = req.query.sales_id;
+    const queryStatusId = req.query.status_id;
     // استقبال معايير الـ Pagination والبحث
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -228,6 +233,9 @@ const getAllSales = async (req, res) => {
     const offset = (page - 1) * limit;
     let whereConditions = [];
     whereConditions.push((0, drizzle_orm_1.ne)(schema_1.visits.status, "visit"));
+    if (queryStatusId) {
+        whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.status_id, queryStatusId));
+    }
     // 1. تطبيق الصلاحيات والفلترة الذكية لـ Drizzle
     if (userRole === "admin") {
         if (querySalesId) {
@@ -358,11 +366,15 @@ const getVisitsCounts = async (req, res) => {
     const userRole = req.user?.role;
     const userId = req.user?.id;
     const querySalesId = req.query.sales_id;
+    const queryStatusId = req.query.status_id;
     // استقبال معايير البحث والتواريخ
     const search = req.query.search || '';
     const fromDateStr = req.query.from; // مثلاً: 2026-05-05
     const toDateStr = req.query.to; // مثلاً: 2026-05-05
     let whereConditions = [];
+    if (queryStatusId) {
+        whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.status_id, queryStatusId));
+    }
     // 1. تطبيق الصلاحيات والفلترة لـ Drizzle
     if (userRole === "admin") {
         if (querySalesId) {
