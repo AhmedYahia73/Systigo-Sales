@@ -121,7 +121,8 @@ export const viewDashboard = async (req: Request, res: Response) => {
         .select({
             negotiation: sql<number>`CAST(COALESCE(COUNT(CASE WHEN ${visits.status} = 'visit' THEN 1 END), 0) AS UNSIGNED)`,
             sales: sql<number>`CAST(COALESCE(COUNT(CASE WHEN ${visits.status} = 'sales' THEN 1 END), 0) AS UNSIGNED)`,
-            delivered: sql<number>`CAST(COALESCE(COUNT(CASE WHEN ${visits.status} = 'delivered' THEN 1 END), 0) AS UNSIGNED)`
+            delivered: sql<number>`CAST(COALESCE(COUNT(CASE WHEN ${visits.status} = 'delivered' THEN 1 END), 0) AS UNSIGNED)`,
+            targetAchievedPoints: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${visits.status} != 'visit' THEN ${visits.points} ELSE 0 END), 0) AS UNSIGNED)`
         })
         .from(visits)
         .where(visitsWhereConditions.length > 0 ? and(...visitsWhereConditions) : undefined);
@@ -132,10 +133,23 @@ export const viewDashboard = async (req: Request, res: Response) => {
 
     const targetAchievedSales = sales + delivered;
     const targetAchievedVisits = negotiation;
+    const targetAchievedPoints = Number(countsResult?.targetAchievedPoints || 0);
 
     // 5. حساب التارجت المخصص بناءً على المستخدم والتواريخ
- // 5. حساب التارجت المخصص بناءً على المستخدم والتواريخ
-    const targetWhereConditions: SQL[] = [eq(target_sales.user_id, userId)];
+    // 5. حساب التارجت المخصص بناءً على المستخدم والتواريخ
+    const targetWhereConditions: SQL[] = [];
+    if (role === "sales") {
+        targetWhereConditions.push(eq(target_sales.user_id, userId));
+    } else if (role === "leader") {
+        if (sales_ids.length > 0) {
+            targetWhereConditions.push(inArray(target_sales.user_id, sales_ids));
+        } else {
+            targetWhereConditions.push(sql`1 = 0`);
+        }
+    } else {
+        // Admin: we don't filter by user, so it calculates the overall total target points
+        // unless you want Admin to just not show a target. But summing all targets is fine.
+    }
     
     if (targetDateConditions.length > 0) {
         targetWhereConditions.push(...(targetDateConditions.filter(Boolean) as SQL[]));
@@ -145,6 +159,7 @@ export const viewDashboard = async (req: Request, res: Response) => {
         .select({
             total_visits_target: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${targets.type} = 'visit' THEN ${target_items.number} END), 0) AS UNSIGNED) AS total_visits_target`,
             total_sales_target: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${targets.type} = 'sales' THEN ${target_items.number} END), 0) AS UNSIGNED) AS total_sales_target`,
+            total_points_target: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${targets.type} = 'points' THEN ${target_items.number} END), 0) AS UNSIGNED) AS total_points_target`,
         })
         .from(target_sales)
         .leftJoin(targets, eq(target_sales.target_id, targets.id))
@@ -153,6 +168,7 @@ export const viewDashboard = async (req: Request, res: Response) => {
 
     const total_visits_target = Number(salesTargetResult?.total_visits_target || 0);
     const total_sales_target = Number(salesTargetResult?.total_sales_target || 0);
+    const total_points_target = Number(salesTargetResult?.total_points_target || 0);
 
     // 6. إرسال الاستجابة النظيفة
     SuccessResponse(res, { 
@@ -162,7 +178,9 @@ export const viewDashboard = async (req: Request, res: Response) => {
         delivered,
         targetAchievedSales,
         targetAchievedVisits,
+        targetAchievedPoints,
         total_visits_target,
         total_sales_target,
+        total_points_target,
     }, 200);
 };

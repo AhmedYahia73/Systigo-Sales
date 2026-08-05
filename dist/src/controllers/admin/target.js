@@ -17,9 +17,9 @@ const crypto_1 = __importDefault(require("crypto"));
 // ==========================================
 exports.createTargetSchema = zod_1.z.object({
     body: zod_1.z.object({
-        type: zod_1.z.enum(["visit", "sales"], {
+        type: zod_1.z.enum(["visit", "sales", "points"], {
             required_error: "Type is required",
-            invalid_type_error: "Type must be either 'visit' or 'sales'",
+            invalid_type_error: "Type must be either 'visit', 'sales', or 'points'",
         }).default("visit"),
         name: zod_1.z.string({
             required_error: "Name is required",
@@ -39,7 +39,7 @@ exports.updateTargetSchema = zod_1.z.object({
         id: zod_1.z.string({ required_error: "ID is required in parameters" }),
     }),
     body: zod_1.z.object({
-        type: zod_1.z.enum(["visit", "sales"]).optional(),
+        type: zod_1.z.enum(["visit", "sales", "points"]).optional(),
         name: zod_1.z.string().min(1, "Name cannot be empty").max(255).optional(),
     }),
 });

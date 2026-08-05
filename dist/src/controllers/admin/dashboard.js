@@ -101,7 +101,8 @@ const viewDashboard = async (req, res) => {
         .select({
         negotiation: (0, drizzle_orm_1.sql) `CAST(COALESCE(COUNT(CASE WHEN ${schema_1.visits.status} = 'visit' THEN 1 END), 0) AS UNSIGNED)`,
         sales: (0, drizzle_orm_1.sql) `CAST(COALESCE(COUNT(CASE WHEN ${schema_1.visits.status} = 'sales' THEN 1 END), 0) AS UNSIGNED)`,
-        delivered: (0, drizzle_orm_1.sql) `CAST(COALESCE(COUNT(CASE WHEN ${schema_1.visits.status} = 'delivered' THEN 1 END), 0) AS UNSIGNED)`
+        delivered: (0, drizzle_orm_1.sql) `CAST(COALESCE(COUNT(CASE WHEN ${schema_1.visits.status} = 'delivered' THEN 1 END), 0) AS UNSIGNED)`,
+        targetAchievedPoints: (0, drizzle_orm_1.sql) `CAST(COALESCE(SUM(CASE WHEN ${schema_1.visits.status} != 'visit' THEN ${schema_1.visits.points} ELSE 0 END), 0) AS UNSIGNED)`
     })
         .from(schema_1.visits)
         .where(visitsWhereConditions.length > 0 ? (0, drizzle_orm_1.and)(...visitsWhereConditions) : undefined);
@@ -110,9 +111,25 @@ const viewDashboard = async (req, res) => {
     const delivered = Number(countsResult?.delivered || 0);
     const targetAchievedSales = sales + delivered;
     const targetAchievedVisits = negotiation;
+    const targetAchievedPoints = Number(countsResult?.targetAchievedPoints || 0);
     // 5. حساب التارجت المخصص بناءً على المستخدم والتواريخ
     // 5. حساب التارجت المخصص بناءً على المستخدم والتواريخ
-    const targetWhereConditions = [(0, drizzle_orm_1.eq)(schema_1.target_sales.user_id, userId)];
+    const targetWhereConditions = [];
+    if (role === "sales") {
+        targetWhereConditions.push((0, drizzle_orm_1.eq)(schema_1.target_sales.user_id, userId));
+    }
+    else if (role === "leader") {
+        if (sales_ids.length > 0) {
+            targetWhereConditions.push((0, drizzle_orm_1.inArray)(schema_1.target_sales.user_id, sales_ids));
+        }
+        else {
+            targetWhereConditions.push((0, drizzle_orm_1.sql) `1 = 0`);
+        }
+    }
+    else {
+        // Admin: we don't filter by user, so it calculates the overall total target points
+        // unless you want Admin to just not show a target. But summing all targets is fine.
+    }
     if (targetDateConditions.length > 0) {
         targetWhereConditions.push(...targetDateConditions.filter(Boolean));
     }
@@ -120,6 +137,7 @@ const viewDashboard = async (req, res) => {
         .select({
         total_visits_target: (0, drizzle_orm_1.sql) `CAST(COALESCE(SUM(CASE WHEN ${schema_1.targets.type} = 'visit' THEN ${schema_1.target_items.number} END), 0) AS UNSIGNED) AS total_visits_target`,
         total_sales_target: (0, drizzle_orm_1.sql) `CAST(COALESCE(SUM(CASE WHEN ${schema_1.targets.type} = 'sales' THEN ${schema_1.target_items.number} END), 0) AS UNSIGNED) AS total_sales_target`,
+        total_points_target: (0, drizzle_orm_1.sql) `CAST(COALESCE(SUM(CASE WHEN ${schema_1.targets.type} = 'points' THEN ${schema_1.target_items.number} END), 0) AS UNSIGNED) AS total_points_target`,
     })
         .from(schema_1.target_sales)
         .leftJoin(schema_1.targets, (0, drizzle_orm_1.eq)(schema_1.target_sales.target_id, schema_1.targets.id))
@@ -127,6 +145,7 @@ const viewDashboard = async (req, res) => {
         .where((0, drizzle_orm_1.and)(...targetWhereConditions));
     const total_visits_target = Number(salesTargetResult?.total_visits_target || 0);
     const total_sales_target = Number(salesTargetResult?.total_sales_target || 0);
+    const total_points_target = Number(salesTargetResult?.total_points_target || 0);
     // 6. إرسال الاستجابة النظيفة
     (0, response_1.SuccessResponse)(res, {
         allVisitStatuss,
@@ -135,8 +154,10 @@ const viewDashboard = async (req, res) => {
         delivered,
         targetAchievedSales,
         targetAchievedVisits,
+        targetAchievedPoints,
         total_visits_target,
         total_sales_target,
+        total_points_target,
     }, 200);
 };
 exports.viewDashboard = viewDashboard;

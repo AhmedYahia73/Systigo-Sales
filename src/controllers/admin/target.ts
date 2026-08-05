@@ -15,9 +15,9 @@ import crypto from "crypto";
 
 export const createTargetSchema = z.object({
   body: z.object({
-    type: z.enum(["visit", "sales"], {
+    type: z.enum(["visit", "sales", "points"], {
       required_error: "Type is required",
-      invalid_type_error: "Type must be either 'visit' or 'sales'",
+      invalid_type_error: "Type must be either 'visit', 'sales', or 'points'",
     }).default("visit"),
     
     name: z.string({
@@ -47,7 +47,7 @@ export const updateTargetSchema = z.object({
     id: z.string({ required_error: "ID is required in parameters" }),
   }),
   body: z.object({
-    type: z.enum(["visit", "sales"]).optional(),
+    type: z.enum(["visit", "sales", "points"]).optional(),
     name: z.string().min(1, "Name cannot be empty").max(255).optional(),
   }),
 });
