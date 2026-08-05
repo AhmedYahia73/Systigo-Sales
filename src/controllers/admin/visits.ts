@@ -169,6 +169,17 @@ export const getAllVisits = async (req: Request, res: Response) => {
         }
     }
 
+    const monthsParam = req.query.months as string;
+    const yearParam = req.query.year as string;
+    if (monthsParam && yearParam) {
+        const months = monthsParam.split(',').map(Number).filter(m => !isNaN(m));
+        const year = Number(yearParam);
+        if (months.length > 0 && !isNaN(year)) {
+            whereConditions.push(inArray(sql`MONTH(${visits.createdAt})`, months));
+            whereConditions.push(eq(sql`YEAR(${visits.createdAt})`, year));
+        }
+    }
+
     // 4. بناء الاستعلام الأساسي (Base Query)
     let baseQuery = db
         .select({
@@ -315,6 +326,17 @@ export const getAllSales = async (req: Request, res: Response) => {
         const toDate = new Date(`${toDateStr}T23:59:59.999Z`);
         if (!isNaN(toDate.getTime())) {
             whereConditions.push(lte(visits.createdAt, toDate));
+        }
+    }
+
+    const monthsParam = req.query.months as string;
+    const yearParam = req.query.year as string;
+    if (monthsParam && yearParam) {
+        const months = monthsParam.split(',').map(Number).filter(m => !isNaN(m));
+        const year = Number(yearParam);
+        if (months.length > 0 && !isNaN(year)) {
+            whereConditions.push(inArray(sql`MONTH(${visits.createdAt})`, months));
+            whereConditions.push(eq(sql`YEAR(${visits.createdAt})`, year));
         }
     }
 
@@ -758,18 +780,16 @@ export const updateVisits = async (req: Request, res: Response) => {
                 )
                 .limit(1);
 
-            if (request_item[0]) {
-                throw new BadRequest("A pending status update request already exists for this visit.");
+            // إذا لم يكن هناك طلب معلق، نقوم بإنشائه
+            if (!request_item[0]) {
+                await db.insert(statusRequest).values({
+                    visitId: currentVisit.id,
+                    from: currentVisit.status as "visit" | "sales" | "delivered",
+                    to: status as "visit" | "sales" | "delivered",
+                    userId: req.user.id,
+                    status: "pending",
+                });
             }
-
-            // إنشاء طلب تغيير حالة جديد
-            await db.insert(statusRequest).values({
-                visitId: currentVisit.id,
-                from: currentVisit.status as "visit" | "sales" | "delivered",
-                to: status as "visit" | "sales" | "delivered",
-                userId: req.user.id,
-                status: "pending",
-            });
         } else {
             // الأدوار الأخرى (Admin / Leader) -> تغيير مباشر
             updateData.status = status;

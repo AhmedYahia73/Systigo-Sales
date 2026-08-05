@@ -146,6 +146,16 @@ const getAllVisits = async (req, res) => {
             whereConditions.push((0, drizzle_orm_1.lte)(schema_1.visits.createdAt, toDate));
         }
     }
+    const monthsParam = req.query.months;
+    const yearParam = req.query.year;
+    if (monthsParam && yearParam) {
+        const months = monthsParam.split(',').map(Number).filter(m => !isNaN(m));
+        const year = Number(yearParam);
+        if (months.length > 0 && !isNaN(year)) {
+            whereConditions.push((0, drizzle_orm_1.inArray)((0, drizzle_orm_1.sql) `MONTH(${schema_1.visits.createdAt})`, months));
+            whereConditions.push((0, drizzle_orm_1.eq)((0, drizzle_orm_1.sql) `YEAR(${schema_1.visits.createdAt})`, year));
+        }
+    }
     // 4. بناء الاستعلام الأساسي (Base Query)
     let baseQuery = db_1.db
         .select({
@@ -275,6 +285,16 @@ const getAllSales = async (req, res) => {
         const toDate = new Date(`${toDateStr}T23:59:59.999Z`);
         if (!isNaN(toDate.getTime())) {
             whereConditions.push((0, drizzle_orm_1.lte)(schema_1.visits.createdAt, toDate));
+        }
+    }
+    const monthsParam = req.query.months;
+    const yearParam = req.query.year;
+    if (monthsParam && yearParam) {
+        const months = monthsParam.split(',').map(Number).filter(m => !isNaN(m));
+        const year = Number(yearParam);
+        if (months.length > 0 && !isNaN(year)) {
+            whereConditions.push((0, drizzle_orm_1.inArray)((0, drizzle_orm_1.sql) `MONTH(${schema_1.visits.createdAt})`, months));
+            whereConditions.push((0, drizzle_orm_1.eq)((0, drizzle_orm_1.sql) `YEAR(${schema_1.visits.createdAt})`, year));
         }
     }
     // 4. بناء الاستعلام الأساسي (Base Query)
@@ -654,17 +674,16 @@ const updateVisits = async (req, res) => {
                 .from(schema_1.statusRequest)
                 .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.statusRequest.visitId, currentVisit.id), (0, drizzle_orm_1.eq)(schema_1.statusRequest.from, currentVisit.status), (0, drizzle_orm_1.eq)(schema_1.statusRequest.to, status), (0, drizzle_orm_1.eq)(schema_1.statusRequest.userId, req.user.id), (0, drizzle_orm_1.eq)(schema_1.statusRequest.status, "pending")))
                 .limit(1);
-            if (request_item[0]) {
-                throw new BadRequest_1.BadRequest("A pending status update request already exists for this visit.");
+            // إذا لم يكن هناك طلب معلق، نقوم بإنشائه
+            if (!request_item[0]) {
+                await db_1.db.insert(schema_1.statusRequest).values({
+                    visitId: currentVisit.id,
+                    from: currentVisit.status,
+                    to: status,
+                    userId: req.user.id,
+                    status: "pending",
+                });
             }
-            // إنشاء طلب تغيير حالة جديد
-            await db_1.db.insert(schema_1.statusRequest).values({
-                visitId: currentVisit.id,
-                from: currentVisit.status,
-                to: status,
-                userId: req.user.id,
-                status: "pending",
-            });
         }
         else {
             // الأدوار الأخرى (Admin / Leader) -> تغيير مباشر

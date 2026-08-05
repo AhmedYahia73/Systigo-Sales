@@ -104,6 +104,16 @@ const getAllSales = async (req, res) => {
         const searchPattern = `%${search.trim()}%`;
         whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.like)(schema_1.users.name, searchPattern), (0, drizzle_orm_1.like)(schema_1.users.phone, searchPattern), (0, drizzle_orm_1.like)(schema_1.users.email, searchPattern)));
     }
+    const monthsParam = req.query.months;
+    const yearParam = req.query.year;
+    if (monthsParam && yearParam) {
+        const months = monthsParam.split(',').map(Number).filter(m => !isNaN(m));
+        const year = Number(yearParam);
+        if (months.length > 0 && !isNaN(year)) {
+            whereConditions.push((0, drizzle_orm_1.inArray)((0, drizzle_orm_1.sql) `MONTH(${schema_1.users.createdAt})`, months));
+            whereConditions.push((0, drizzle_orm_1.eq)((0, drizzle_orm_1.sql) `YEAR(${schema_1.users.createdAt})`, year));
+        }
+    }
     // 5. بناء استعلام البيانات الأساسي (Base Query)
     let query = db_1.db
         .select({

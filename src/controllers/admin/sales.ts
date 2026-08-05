@@ -10,7 +10,7 @@ import bcrypt from "bcrypt";
 import { saveBase64Image } from "../../utils/handleImages";
 import { deletePhotoFromServer } from "../../utils/deleteImage";
 import { z } from "zod";
-import { SQL, and, or, eq, like, count, desc, ne, aliasedTable} from 'drizzle-orm';
+import { SQL, and, or, eq, like, count, desc, ne, aliasedTable, sql, inArray} from 'drizzle-orm';
 // ==========================================
 // 🛡️ Zod Validation Schemas
 // ==========================================
@@ -129,6 +129,17 @@ export const getAllSales = async (req: Request, res: Response) => {
                 like(users.email, searchPattern)
             ) as SQL
         );
+    }
+
+    const monthsParam = req.query.months as string;
+    const yearParam = req.query.year as string;
+    if (monthsParam && yearParam) {
+        const months = monthsParam.split(',').map(Number).filter(m => !isNaN(m));
+        const year = Number(yearParam);
+        if (months.length > 0 && !isNaN(year)) {
+            whereConditions.push(inArray(sql`MONTH(${users.createdAt})`, months));
+            whereConditions.push(eq(sql`YEAR(${users.createdAt})`, year));
+        }
     }
 
     // 5. بناء استعلام البيانات الأساسي (Base Query)
