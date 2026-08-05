@@ -162,14 +162,25 @@ const changeStatus = async (req, res) => {
         .where((0, drizzle_orm_1.eq)(schema_1.statusRequest.id, id));
     if (status === "approve") {
         const visitUpdateData = { status: existRequest[0].to };
-        if (existRequest[0].to === "sales") {
+        if (existRequest[0].to === "sales" || existRequest[0].to === "delivered") {
             const visit = await db_1.db.select().from(schema_1.visits).where((0, drizzle_orm_1.eq)(schema_1.visits.id, existRequest[0].visitId)).limit(1);
             if (visit[0] && visit[0].product_id && visit[0].duration) {
                 const product = await db_1.db.select().from(schema_1.products).where((0, drizzle_orm_1.eq)(schema_1.products.id, visit[0].product_id)).limit(1);
-                if (product[0] && Array.isArray(product[0].points)) {
-                    const pointEntry = product[0].points.find((p) => p.duration === visit[0].duration);
-                    if (pointEntry) {
-                        visitUpdateData.points = pointEntry.point;
+                if (product[0] && product[0].points) {
+                    let pointsData = product[0].points;
+                    if (typeof pointsData === 'string') {
+                        try {
+                            pointsData = JSON.parse(pointsData);
+                        }
+                        catch (e) {
+                            pointsData = [];
+                        }
+                    }
+                    if (Array.isArray(pointsData)) {
+                        const pointEntry = pointsData.find((p) => p.duration === visit[0].duration);
+                        if (pointEntry) {
+                            visitUpdateData.points = pointEntry.point;
+                        }
                     }
                 }
             }

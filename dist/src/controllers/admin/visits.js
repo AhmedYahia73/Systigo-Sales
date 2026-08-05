@@ -554,10 +554,21 @@ const createVisits = async (req, res) => {
         insertData.duration = validated.body.duration;
     if ((status === "sales" || status === "delivered") && validated.body.product_id && validated.body.duration && (req.user?.role === "leader" || req.user?.role === "admin")) {
         const product = await db_1.db.select().from(schema_1.products).where((0, drizzle_orm_1.eq)(schema_1.products.id, validated.body.product_id)).limit(1);
-        if (product[0] && Array.isArray(product[0].points)) {
-            const pointEntry = product[0].points.find((p) => p.duration === validated.body.duration);
-            if (pointEntry) {
-                insertData.points = pointEntry.point;
+        if (product[0] && product[0].points) {
+            let pointsData = product[0].points;
+            if (typeof pointsData === 'string') {
+                try {
+                    pointsData = JSON.parse(pointsData);
+                }
+                catch (e) {
+                    pointsData = [];
+                }
+            }
+            if (Array.isArray(pointsData)) {
+                const pointEntry = pointsData.find((p) => p.duration === validated.body.duration);
+                if (pointEntry) {
+                    insertData.points = pointEntry.point;
+                }
             }
         }
     }
@@ -660,10 +671,21 @@ const updateVisits = async (req, res) => {
             updateData.status = status;
             if ((status === "sales" || status === "delivered") && validated.body.product_id && validated.body.duration) {
                 const product = await db_1.db.select().from(schema_1.products).where((0, drizzle_orm_1.eq)(schema_1.products.id, validated.body.product_id)).limit(1);
-                if (product[0] && Array.isArray(product[0].points)) {
-                    const pointEntry = product[0].points.find((p) => p.duration === validated.body.duration);
-                    if (pointEntry) {
-                        updateData.points = pointEntry.point;
+                if (product[0] && product[0].points) {
+                    let pointsData = product[0].points;
+                    if (typeof pointsData === 'string') {
+                        try {
+                            pointsData = JSON.parse(pointsData);
+                        }
+                        catch (e) {
+                            pointsData = [];
+                        }
+                    }
+                    if (Array.isArray(pointsData)) {
+                        const pointEntry = pointsData.find((p) => p.duration === validated.body.duration);
+                        if (pointEntry) {
+                            updateData.points = pointEntry.point;
+                        }
                     }
                 }
             }
