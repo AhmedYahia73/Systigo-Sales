@@ -2,7 +2,7 @@
 
 import { Request, Response } from "express";
 import { db } from "../../models/db";
-import { statusRequest, visits, users } from "../../models/schema"; 
+import { statusRequest, visits, users, products } from "../../models/schema"; 
 import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound";
 import { z } from "zod"; 
@@ -192,8 +192,23 @@ export const changeStatus = async (req: Request, res: Response) => {
         .set({ status })
         .where(eq(statusRequest.id, id));
     if(status === "approve") { 
+        const visitUpdateData: any = { status: existRequest[0].to };
+        
+        if (existRequest[0].to === "sales") {
+            const visit = await db.select().from(visits).where(eq(visits.id, existRequest[0].visitId)).limit(1);
+            if (visit[0] && visit[0].product_id && visit[0].duration) {
+                const product = await db.select().from(products).where(eq(products.id, visit[0].product_id)).limit(1);
+                if (product[0] && Array.isArray(product[0].points)) {
+                    const pointEntry = product[0].points.find((p: any) => p.duration === visit[0].duration);
+                    if (pointEntry) {
+                        visitUpdateData.points = pointEntry.point;
+                    }
+                }
+            }
+        }
+        
         await db.update(visits)
-        .set({status : existRequest[0].to})
+        .set(visitUpdateData)
         .where(eq(visits.id, existRequest[0].visitId));
     }
 

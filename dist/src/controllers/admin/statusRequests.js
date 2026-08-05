@@ -161,8 +161,21 @@ const changeStatus = async (req, res) => {
         .set({ status })
         .where((0, drizzle_orm_1.eq)(schema_1.statusRequest.id, id));
     if (status === "approve") {
+        const visitUpdateData = { status: existRequest[0].to };
+        if (existRequest[0].to === "sales") {
+            const visit = await db_1.db.select().from(schema_1.visits).where((0, drizzle_orm_1.eq)(schema_1.visits.id, existRequest[0].visitId)).limit(1);
+            if (visit[0] && visit[0].product_id && visit[0].duration) {
+                const product = await db_1.db.select().from(schema_1.products).where((0, drizzle_orm_1.eq)(schema_1.products.id, visit[0].product_id)).limit(1);
+                if (product[0] && Array.isArray(product[0].points)) {
+                    const pointEntry = product[0].points.find((p) => p.duration === visit[0].duration);
+                    if (pointEntry) {
+                        visitUpdateData.points = pointEntry.point;
+                    }
+                }
+            }
+        }
         await db_1.db.update(schema_1.visits)
-            .set({ status: existRequest[0].to })
+            .set(visitUpdateData)
             .where((0, drizzle_orm_1.eq)(schema_1.visits.id, existRequest[0].visitId));
     }
     (0, response_1.SuccessResponse)(res, { message: "Status updated successfully" }, 200);

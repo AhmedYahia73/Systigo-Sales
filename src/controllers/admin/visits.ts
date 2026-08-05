@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { db } from "../../models/db";
-import { users, visits, visitStatus, statusRequest, wishList } from "../../models/schema"; 
+import { users, visits, visitStatus, statusRequest, wishList, products } from "../../models/schema"; 
 import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound";
 import { BadRequest } from "../../Errors/BadRequest";
@@ -46,6 +46,8 @@ export const createVisitSchema = (userRole?: string) => {
             sales_id: userRole === "sales" || userRole === "leader"
                 ? z.string().uuid().optional()
                 : z.string({ required_error: "Sales ID is required" }),
+            product_id: z.string().nullable().optional(),
+            duration: z.string().nullable().optional(),
         }),
     }); 
 };
@@ -64,6 +66,8 @@ export const updateVisitSchema = z.object({
         status: z.enum(["visit", "sales", "delivered"]).optional(),
         status_id: z.string().nullable().optional(),
         sales_id: z.string().nullable().optional(),
+        product_id: z.string().nullable().optional(),
+        duration: z.string().nullable().optional(),
     }),
 });
 
@@ -628,7 +632,7 @@ export const createVisits = async (req: Request, res: Response) => {
     }
 
     // 5. إنشاء الزيارة في قاعدة البيانات
-    await db.insert(visits).values({ 
+    const insertData: any = { 
         lat,
         lng,
         name,
@@ -638,7 +642,22 @@ export const createVisits = async (req: Request, res: Response) => {
         status: status as any, 
         status_id: status_id || null,
         sales_id,
-    });
+    };
+    
+    if (validated.body.product_id !== undefined) insertData.product_id = validated.body.product_id;
+    if (validated.body.duration !== undefined) insertData.duration = validated.body.duration;
+    
+    if (status === "sales" && validated.body.product_id && validated.body.duration && (req.user?.role === "leader" || req.user?.role === "admin")) {
+        const product = await db.select().from(products).where(eq(products.id, validated.body.product_id)).limit(1);
+        if (product[0] && Array.isArray(product[0].points)) {
+            const pointEntry = product[0].points.find((p: any) => p.duration === validated.body.duration);
+            if (pointEntry) {
+                insertData.points = pointEntry.point;
+            }
+        }
+    }
+
+    await db.insert(visits).values(insertData);
 
     SuccessResponse(res, { message: "Visit created successfully" }, 201);
 };
@@ -699,7 +718,6 @@ export const updateVisits = async (req: Request, res: Response) => {
         }
     }
 
-    // بناء كائن التحديث بشكل ديناميكي
     const updateData: Record<string, any> = {};
     if (lat !== undefined) updateData.lat = lat;
     if (lng !== undefined) updateData.lng = lng;
@@ -709,6 +727,8 @@ export const updateVisits = async (req: Request, res: Response) => {
     if (phone !== undefined) updateData.phone = phone;
     if (status_id !== undefined) updateData.status_id = status_id;
     if (sales_id !== undefined && req.user?.role !== "sales") updateData.sales_id = sales_id;
+    if (validated.body.product_id !== undefined) updateData.product_id = validated.body.product_id;
+    if (validated.body.duration !== undefined) updateData.duration = validated.body.duration;
 
     // التعامل مع الـ Status ورتب المستخدمين (Roles)
     if (status !== undefined) {
@@ -747,6 +767,16 @@ export const updateVisits = async (req: Request, res: Response) => {
         } else {
             // الأدوار الأخرى (Admin / Leader) -> تغيير مباشر
             updateData.status = status;
+            
+            if (status === "sales" && validated.body.product_id && validated.body.duration) {
+                const product = await db.select().from(products).where(eq(products.id, validated.body.product_id)).limit(1);
+                if (product[0] && Array.isArray(product[0].points)) {
+                    const pointEntry = product[0].points.find((p: any) => p.duration === validated.body.duration);
+                    if (pointEntry) {
+                        updateData.points = pointEntry.point;
+                    }
+                }
+            }
         }
     }
 

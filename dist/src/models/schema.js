@@ -22,5 +22,6 @@ __exportStar(require("./superadmin/wishList"), exports);
 __exportStar(require("./superadmin/target_items"), exports);
 __exportStar(require("./superadmin/target_sales"), exports);
 __exportStar(require("./superadmin/statusRequest"), exports);
+__exportStar(require("./superadmin/products"), exports);
 // Admin Models
 // src/models/schema/index.ts

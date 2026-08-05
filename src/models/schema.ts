@@ -7,5 +7,6 @@ export * from "./superadmin/wishList"
 export * from "./superadmin/target_items"
 export * from "./superadmin/target_sales"
 export * from "./superadmin/statusRequest"
+export * from "./superadmin/products"
 // Admin Models
 // src/models/schema/index.ts

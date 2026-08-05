@@ -40,6 +40,8 @@ const createVisitSchema = (userRole) => {
             sales_id: userRole === "sales" || userRole === "leader"
                 ? zod_1.z.string().uuid().optional()
                 : zod_1.z.string({ required_error: "Sales ID is required" }),
+            product_id: zod_1.z.string().nullable().optional(),
+            duration: zod_1.z.string().nullable().optional(),
         }),
     });
 };
@@ -58,6 +60,8 @@ exports.updateVisitSchema = zod_1.z.object({
         status: zod_1.z.enum(["visit", "sales", "delivered"]).optional(),
         status_id: zod_1.z.string().nullable().optional(),
         sales_id: zod_1.z.string().nullable().optional(),
+        product_id: zod_1.z.string().nullable().optional(),
+        duration: zod_1.z.string().nullable().optional(),
     }),
 });
 exports.VisitIdSchema = zod_1.z.object({
@@ -533,7 +537,7 @@ const createVisits = async (req, res) => {
         }
     }
     // 5. إنشاء الزيارة في قاعدة البيانات
-    await db_1.db.insert(schema_1.visits).values({
+    const insertData = {
         lat,
         lng,
         name,
@@ -543,7 +547,21 @@ const createVisits = async (req, res) => {
         status: status,
         status_id: status_id || null,
         sales_id,
-    });
+    };
+    if (validated.body.product_id !== undefined)
+        insertData.product_id = validated.body.product_id;
+    if (validated.body.duration !== undefined)
+        insertData.duration = validated.body.duration;
+    if (status === "sales" && validated.body.product_id && validated.body.duration && (req.user?.role === "leader" || req.user?.role === "admin")) {
+        const product = await db_1.db.select().from(schema_1.products).where((0, drizzle_orm_1.eq)(schema_1.products.id, validated.body.product_id)).limit(1);
+        if (product[0] && Array.isArray(product[0].points)) {
+            const pointEntry = product[0].points.find((p) => p.duration === validated.body.duration);
+            if (pointEntry) {
+                insertData.points = pointEntry.point;
+            }
+        }
+    }
+    await db_1.db.insert(schema_1.visits).values(insertData);
     (0, response_1.SuccessResponse)(res, { message: "Visit created successfully" }, 201);
 };
 exports.createVisits = createVisits;
@@ -592,7 +610,6 @@ const updateVisits = async (req, res) => {
             throw new BadRequest_1.BadRequest("The updated status_id does not exist.");
         }
     }
-    // بناء كائن التحديث بشكل ديناميكي
     const updateData = {};
     if (lat !== undefined)
         updateData.lat = lat;
@@ -610,6 +627,10 @@ const updateVisits = async (req, res) => {
         updateData.status_id = status_id;
     if (sales_id !== undefined && req.user?.role !== "sales")
         updateData.sales_id = sales_id;
+    if (validated.body.product_id !== undefined)
+        updateData.product_id = validated.body.product_id;
+    if (validated.body.duration !== undefined)
+        updateData.duration = validated.body.duration;
     // التعامل مع الـ Status ورتب المستخدمين (Roles)
     if (status !== undefined) {
         if (req.user?.role === "sales") {
@@ -637,6 +658,15 @@ const updateVisits = async (req, res) => {
         else {
             // الأدوار الأخرى (Admin / Leader) -> تغيير مباشر
             updateData.status = status;
+            if (status === "sales" && validated.body.product_id && validated.body.duration) {
+                const product = await db_1.db.select().from(schema_1.products).where((0, drizzle_orm_1.eq)(schema_1.products.id, validated.body.product_id)).limit(1);
+                if (product[0] && Array.isArray(product[0].points)) {
+                    const pointEntry = product[0].points.find((p) => p.duration === validated.body.duration);
+                    if (pointEntry) {
+                        updateData.points = pointEntry.point;
+                    }
+                }
+            }
         }
     }
     // شرط التحديث في قاعدة البيانات
