@@ -160,7 +160,6 @@ const getAllVisits = async (req, res) => {
             whereConditions.push((0, drizzle_orm_1.eq)((0, drizzle_orm_1.sql) `YEAR(${schema_1.visits.createdAt})`, year));
         }
     }
-    // 4. بناء الاستعلام الأساسي (Base Query)
     let baseQuery = db_1.db
         .select({
         id: schema_1.visits.id,
@@ -176,6 +175,8 @@ const getAllVisits = async (req, res) => {
         sales_id: schema_1.users.id,
         sales: schema_1.users.name,
         sales_phone: schema_1.users.phone,
+        product_id: schema_1.visits.product_id,
+        duration: schema_1.visits.duration,
         createdAt: (0, drizzle_orm_1.sql) `DATE_FORMAT(${schema_1.visits.createdAt}, '%Y-%m-%d')`,
     })
         .from(schema_1.visits)
@@ -321,11 +322,15 @@ const getAllSales = async (req, res) => {
         sales_id: schema_1.users.id,
         sales: schema_1.users.name,
         sales_phone: schema_1.users.phone,
+        product_id: schema_1.visits.product_id,
+        duration: schema_1.visits.duration,
+        product: schema_1.products.name,
         createdAt: schema_1.visits.createdAt
     })
         .from(schema_1.visits)
         .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.visits.sales_id, schema_1.users.id))
         .leftJoin(schema_1.visitStatus, (0, drizzle_orm_1.eq)(schema_1.visits.status_id, schema_1.visitStatus.id))
+        .leftJoin(schema_1.products, (0, drizzle_orm_1.eq)(schema_1.visits.product_id, schema_1.products.id))
         .orderBy((0, drizzle_orm_1.desc)(schema_1.visits.createdAt))
         .$dynamic();
     // 5. استعلام لحساب العدد الإجمالي متوافق مع الفلاتر (Count Query)
@@ -504,6 +509,8 @@ const getVisitsById = async (req, res) => {
         status: schema_1.visits.status,
         status_id: schema_1.visits.status_id,
         sales_id: schema_1.visits.sales_id,
+        product_id: schema_1.visits.product_id,
+        duration: schema_1.visits.duration,
     })
         .from(schema_1.visits)
         .where((0, drizzle_orm_1.eq)(schema_1.visits.id, id))

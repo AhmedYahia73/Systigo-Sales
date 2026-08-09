@@ -184,8 +184,7 @@ export const getAllVisits = async (req: Request, res: Response) => {
             whereConditions.push(eq(sql`YEAR(${visits.createdAt})`, year));
         }
     }
-
-    // 4. بناء الاستعلام الأساسي (Base Query)
+ 
     let baseQuery = db
         .select({
             id: visits.id, 
@@ -201,6 +200,8 @@ export const getAllVisits = async (req: Request, res: Response) => {
             sales_id: users.id,
             sales: users.name,
             sales_phone: users.phone,
+            product_id: visits.product_id,
+            duration: visits.duration,
             createdAt: sql<string>`DATE_FORMAT(${visits.createdAt}, '%Y-%m-%d')`,
         })
         .from(visits)
@@ -365,11 +366,15 @@ export const getAllSales = async (req: Request, res: Response) => {
             sales_id: users.id,
             sales: users.name,
             sales_phone: users.phone,
+            product_id: visits.product_id,
+            duration: visits.duration,
+            product: products.name,
             createdAt: visits.createdAt
         })
         .from(visits)
         .leftJoin(users, eq(visits.sales_id, users.id))
         .leftJoin(visitStatus, eq(visits.status_id, visitStatus.id))
+        .leftJoin(products, eq(visits.product_id, products.id))
         .orderBy(desc(visits.createdAt))
         .$dynamic();
 
@@ -587,6 +592,8 @@ export const getVisitsById = async (req: Request, res: Response) => {
             status: visits.status,
             status_id: visits.status_id,
             sales_id: visits.sales_id,
+            product_id: visits.product_id,
+            duration: visits.duration,
         })
         .from(visits) 
         .where(eq(visits.id, id))
