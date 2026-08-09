@@ -176,7 +176,7 @@ const getAllVisits = async (req, res) => {
         sales_id: schema_1.users.id,
         sales: schema_1.users.name,
         sales_phone: schema_1.users.phone,
-        createdAt: (0, drizzle_orm_1.sql) `TO_CHAR(${schema_1.visits.createdAt}, 'YYYY-MM-DD')`
+        createdAt: (0, drizzle_orm_1.sql) `DATE_FORMAT(${schema_1.visits.createdAt}, '%Y-%m-%d')`,
     })
         .from(schema_1.visits)
         .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.visits.sales_id, schema_1.users.id))
