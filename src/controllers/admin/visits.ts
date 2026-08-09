@@ -201,7 +201,7 @@ export const getAllVisits = async (req: Request, res: Response) => {
             sales_id: users.id,
             sales: users.name,
             sales_phone: users.phone,
-            createdAt: visits.createdAt
+            createdAt: sql<string>`TO_CHAR(${visits.createdAt}, 'YYYY-MM-DD')`
         })
         .from(visits)
         .leftJoin(users, eq(visits.sales_id, users.id))
