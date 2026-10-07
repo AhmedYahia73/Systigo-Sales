@@ -25,6 +25,16 @@ export const createVisitSchema = (userRole?: string) => {
                 .min(1, "Name cannot be empty")
                 .max(255, "Name cannot exceed 255 characters"),
             
+            owner_name: z.string()
+                .max(255, "Owner name cannot exceed 255 characters")
+                .nullable()
+                .optional(),
+            
+            owner_phone: z.string()
+                .max(20, "Owner phone cannot exceed 20 characters")
+                .nullable()
+                .optional(),
+            
             address: z.string({ required_error: "Address is required" })
                 .min(1, "Address cannot be empty")
                 .max(500, "Address cannot exceed 500 characters"),
@@ -60,6 +70,8 @@ export const updateVisitSchema = z.object({
         lat: z.number().min(-90).max(90).optional(),
         lng: z.number().min(-180).max(180).optional(),
         name: z.string().min(1).max(255).optional(),
+        owner_name: z.string().max(255).nullable().optional(),
+        owner_phone: z.string().max(20).nullable().optional(),
         address: z.string().min(1).max(500).optional(),
         notes: z.string().max(1000).nullable().optional(),
         phone: z.string().min(5).max(20).optional(),
@@ -150,7 +162,9 @@ export const getAllVisits = async (req: Request, res: Response) => {
         whereConditions.push(
             or(
                 like(visits.name, searchPattern),         // اسم العميل/الزيارة
+                like(visits.owner_name, searchPattern),   // اسم المالك
                 like(visits.phone, searchPattern),        // هاتف العميل/الزيارة
+                like(visits.owner_phone, searchPattern),  // هاتف المالك
                 like(users.name, searchPattern),          // اسم المندوب
                 like(users.email, searchPattern),         // إيميل المندوب
                 like(users.phone, searchPattern)          // هاتف المندوب
@@ -191,6 +205,8 @@ export const getAllVisits = async (req: Request, res: Response) => {
             lat: visits.lat,
             lng: visits.lng,
             name: visits.name,
+            owner_name: visits.owner_name,
+            owner_phone: visits.owner_phone,
             address: visits.address,
             notes: visits.notes,
             phone: visits.phone,
@@ -315,7 +331,9 @@ export const getAllSales = async (req: Request, res: Response) => {
         whereConditions.push(
             or(
                 like(visits.name, searchPattern),         // اسم العميل/الزيارة
+                like(visits.owner_name, searchPattern),   // اسم المالك
                 like(visits.phone, searchPattern),        // هاتف العميل/الزيارة
+                like(visits.owner_phone, searchPattern),  // هاتف المالك
                 like(users.name, searchPattern),          // اسم المندوب
                 like(users.email, searchPattern),         // إيميل المندوب
                 like(users.phone, searchPattern)          // هاتف المندوب
@@ -357,6 +375,8 @@ export const getAllSales = async (req: Request, res: Response) => {
             lat: visits.lat,
             lng: visits.lng,
             name: visits.name,
+            owner_name: visits.owner_name,
+            owner_phone: visits.owner_phone,
             address: visits.address,
             notes: visits.notes,
             phone: visits.phone,
@@ -586,6 +606,8 @@ export const getVisitsById = async (req: Request, res: Response) => {
             lat: visits.lat,
             lng: visits.lng,
             name: visits.name, 
+            owner_name: visits.owner_name,
+            owner_phone: visits.owner_phone,
             address: visits.address,
             notes: visits.notes,
             phone: visits.phone,
@@ -619,7 +641,7 @@ export const getVisitsById = async (req: Request, res: Response) => {
 // ✅ Create Visits
 export const createVisits = async (req: Request, res: Response) => {
     const validated = await createVisitSchema(req.user?.role).parseAsync({ body: req.body });
-    const { lat, lng, name, address, notes, phone, status_id } = validated.body;
+    const { lat, lng, name, address, notes, phone, status_id, owner_name, owner_phone } = validated.body;
     
     // 1. تحديد قيمة الـ status بشكل آمن حسب الدور
     let status = "visit";
@@ -679,6 +701,8 @@ export const createVisits = async (req: Request, res: Response) => {
         lat,
         lng,
         name,
+        owner_name: owner_name || null,
+        owner_phone: owner_phone || null,
         address,
         notes: notes || null,
         phone,
@@ -718,7 +742,7 @@ export const updateVisits = async (req: Request, res: Response) => {
         body: req.body 
     });
     const { id } = validated.params;
-    const { lat, lng, name, address, notes, phone, status, status_id } = validated.body;
+    const { lat, lng, name, address, notes, phone, status, status_id, owner_name, owner_phone } = validated.body;
   
     // 🔍 1. التأكد من وجود الزيارة الأصلية
     const existingVisit = await db
@@ -771,6 +795,8 @@ export const updateVisits = async (req: Request, res: Response) => {
     if (lat !== undefined) updateData.lat = lat;
     if (lng !== undefined) updateData.lng = lng;
     if (name !== undefined) updateData.name = name;
+    if (owner_name !== undefined) updateData.owner_name = owner_name || null;
+    if (owner_phone !== undefined) updateData.owner_phone = owner_phone || null;
     if (address !== undefined) updateData.address = address;
     if (notes !== undefined) updateData.notes = notes;
     if (phone !== undefined) updateData.phone = phone;

@@ -19,6 +19,8 @@ export const visits = mysqlTable("visits", {
   lat: double("lat").notNull(),
   lng: double("lng").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
+  owner_name: varchar("owner_name", { length: 255 }),
+  owner_phone: varchar("owner_phone", { length: 20 }),
   address: varchar("address", { length: 500 }).notNull(),
   notes: varchar("notes", { length: 1000 }),
   phone: varchar("phone", { length: 20 }).notNull(),
