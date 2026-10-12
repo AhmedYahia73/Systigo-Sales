@@ -49,12 +49,21 @@ function isZodSchema(val: any): boolean {
   return Boolean(val && typeof val === "object" && val._def && typeof val.parseAsync === "function");
 }
 
-function resolveZodSchema(schemaOrFactory: any): any {
+function resolveZodSchema(schemaOrFactory: any, nameHint = ""): any {
   if (!schemaOrFactory) return null;
   if (isZodSchema(schemaOrFactory)) return schemaOrFactory;
   if (typeof schemaOrFactory === "function") {
+    if (schemaOrFactory.__originalFn) return null;
+    if (schemaOrFactory.constructor?.name === "AsyncFunction") return null;
+    const fnName = nameHint || schemaOrFactory.name || "";
+    if (!/schema$/i.test(fnName)) return null;
+    if (schemaOrFactory.length > 1) return null;
     try {
       const result = schemaOrFactory();
+      if (result && typeof result.then === "function") {
+        result.catch?.(() => {});
+        return null;
+      }
       if (isZodSchema(result)) return result;
     } catch {
       return null;
@@ -301,7 +310,7 @@ function registerModuleExports(mod: Record<string, any>) {
 
   // 1. Collect all exported Zod schemas or schema factory functions in this module
   for (const [exportName, exportVal] of Object.entries(mod)) {
-    const resolved = resolveZodSchema(exportVal);
+    const resolved = resolveZodSchema(exportVal, exportName);
     if (resolved) {
       localSchemas.set(exportName, exportVal);
       globalSchemaRegistry.set(exportName, exportVal);
@@ -312,15 +321,19 @@ function registerModuleExports(mod: Record<string, any>) {
   for (const [exportName, exportVal] of Object.entries(mod)) {
     if (typeof exportVal !== "function" || localSchemas.has(exportName)) continue;
 
-    if ((exportVal as any).__zodSchema) {
-      controllerSchemaMap.set(exportVal, {
+    const targetFn = (exportVal as any).__originalFn || exportVal;
+
+    if ((exportVal as any).__zodSchema || targetFn.__zodSchema) {
+      const entry = {
         schemaName: `${exportName}Schema`,
-        schema: (exportVal as any).__zodSchema,
-      });
+        schema: (exportVal as any).__zodSchema || targetFn.__zodSchema,
+      };
+      controllerSchemaMap.set(exportVal, entry);
+      if (targetFn !== exportVal) controllerSchemaMap.set(targetFn, entry);
       continue;
     }
 
-    const fnSource = Function.prototype.toString.call(exportVal);
+    const fnSource = Function.prototype.toString.call(targetFn);
     // 1. Match patterns like:
     //   createTargetSchema.parseAsync(...)
     //   createVisitSchema(req.user?.role).parseAsync(...)
@@ -347,10 +360,12 @@ function registerModuleExports(mod: Record<string, any>) {
       const matchedSchema =
         localSchemas.get(matchedKey) || globalSchemaRegistry.get(matchedKey);
       if (matchedSchema) {
-        controllerSchemaMap.set(exportVal, {
+        const entry = {
           schemaName: matchedKey,
           schema: matchedSchema,
-        });
+        };
+        controllerSchemaMap.set(exportVal, entry);
+        if (targetFn !== exportVal) controllerSchemaMap.set(targetFn, entry);
       }
     }
   }
@@ -591,7 +606,7 @@ function findZodSchemaForRoute(routeStack: any[]): { schemaName: string; zodObje
     return handlerName ? { schemaName: "", zodObject: null, handlerName } : null;
   }
 
-  const resolved = resolveZodSchema(foundEntry.schema);
+  const resolved = resolveZodSchema(foundEntry.schema, foundEntry.schemaName);
   return {
     schemaName:
       foundEntry.schemaName === "RequestSchema" && handlerName
