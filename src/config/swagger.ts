@@ -805,12 +805,12 @@ const options: swaggerJSDoc.Options = {
         description: "Current Server (Auto)",
       },
       {
-        url: "https://salesbcknd.food2go.online",
-        description: "Production Server (food2go)",
+        url: "https://salesbacknd.systego.net",
+        description: "Server (salesbacknd.systego.net)",
       },
       {
-        url: "https://salesbcknd.systego.net",
-        description: "Server (systego)",
+        url: "https://salesbcknd.food2go.online",
+        description: "Production Server (food2go)",
       },
       {
         url: "http://localhost:3001",
@@ -841,26 +841,26 @@ export const getSwaggerSpec = () => {
 };
 
 export const setupSwagger = (app: Express) => {
+  const swaggerSpec = getSwaggerSpec();
+
   // JSON endpoint for inspecting the generated OpenAPI spec
   app.get("/api-docs.json", (_req, res) => {
     res.setHeader("Content-Type", "application/json");
     res.send(getSwaggerSpec());
   });
 
-  // Swagger UI endpoint (regenerates dynamically from live Zod schemas)
+  // Swagger UI endpoint
   app.use(
     "/api-docs",
     swaggerUi.serve,
-    (req: any, res: any, next: any) => {
-      const swaggerSpec = getSwaggerSpec();
-      return swaggerUi.setup(swaggerSpec, {
-        explorer: true,
-        swaggerOptions: {
-          persistAuthorization: true,
-          docExpansion: "list",
-        },
-      })(req, res, next);
-    }
+    swaggerUi.setup(swaggerSpec, {
+      explorer: true,
+      swaggerOptions: {
+        url: "/api-docs.json",
+        persistAuthorization: true,
+        docExpansion: "list",
+      },
+    })
   );
 
   console.log("📝 Swagger documentation (Auto-Zod) is available at /api-docs");

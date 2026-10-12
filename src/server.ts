@@ -35,6 +35,7 @@ app.use(cors({
 app.use(
   helmet({
     crossOriginResourcePolicy: false,
+    contentSecurityPolicy: false,
   })
 );
 app.use(cookieParser());
