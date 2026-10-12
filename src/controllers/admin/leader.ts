@@ -68,6 +68,14 @@ export const leaderIdSchema = z.object({
   }),
 });
 
+export const getAllLeaderSchema = z.object({
+  query: z.object({
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+    search: z.string().optional(),
+  }),
+});
+
 
 // ==========================================
 // 🎮 Controllers
@@ -76,6 +84,7 @@ export const leaderIdSchema = z.object({
 // ✅ Get All Leaders
 
 export const getAllLeader = async (req: Request, res: Response) => {
+    await getAllLeaderSchema.parseAsync({ query: req.query });
     // استقبال معايير الـ Pagination والبحث
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;

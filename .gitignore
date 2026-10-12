@@ -1,5 +1,8 @@
 .env
+.env.*
+!.env.example
 node_modules
 uploads
 dist/uploads
 src/scripts/generate_test_tokens.ts
+

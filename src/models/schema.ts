@@ -8,5 +8,6 @@ export * from "./superadmin/target_items"
 export * from "./superadmin/target_sales"
 export * from "./superadmin/statusRequest"
 export * from "./superadmin/products"
+export * from "./superadmin/leads"
 // Admin Models
 // src/models/schema/index.ts

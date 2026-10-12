@@ -1,5 +1,3 @@
-// src/controllers/Sales/SalesController.ts
-
 import { Request, Response } from "express";
 import { db } from "../../models/db";
 import { statusRequest, visits, users, products } from "../../models/schema"; 
@@ -7,6 +5,7 @@ import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound";
 import { z } from "zod"; 
 import { eq, desc, or, like, count, and, ne } from 'drizzle-orm';
+import { calculatePointsForProducts, parseProductsArray } from "./visits";
 
 // ==========================================
 // 🛡️ Zod Validation Schemas
@@ -24,20 +23,27 @@ export const requestIdSchema = z.object({
   }),
 });
 
+export const getRequestsSchema = z.object({
+  query: z.object({
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+    search: z.string().optional(),
+  }),
+});
+
 // ==========================================
 // 🎮 Controllers
 // ==========================================
 
 // ✅ Get Pending Requests
 export const getPendingRequest = async (req: Request, res: Response) => {
-    // 1. استخراج معاملات البحث والصفحات من الـ query
+    await getRequestsSchema.parseAsync({ query: req.query });
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.max(1, parseInt(req.query.limit as string) || 10);
     const search = (req.query.search as string || '').trim();
 
     const offset = (page - 1) * limit;
 
-    // 2. الشروط
     const baseCondition = eq(statusRequest.status, 'pending');
 
     const leaderCondition = req.user?.role === "leader" 
@@ -52,10 +58,8 @@ export const getPendingRequest = async (req: Request, res: Response) => {
           )
         : undefined;
 
-    // دمج الشروط تلقائياً (تتجاهل Drizzle القيم الـ undefined)
     const whereClause = and(baseCondition, leaderCondition, searchCondition);
 
-    // 3. استعلام جلب البيانات
     const pendingRequests = await db
         .select({
             id: statusRequest.id,
@@ -75,7 +79,6 @@ export const getPendingRequest = async (req: Request, res: Response) => {
         .limit(limit)
         .offset(offset);
 
-    // 4. استعلام حساب الإجمالي
     const [{ total }] = await db
         .select({ total: count() })
         .from(statusRequest)
@@ -85,7 +88,6 @@ export const getPendingRequest = async (req: Request, res: Response) => {
 
     const totalPages = Math.ceil(total / limit);
 
-    // 5. إرسال الاستجابة
     SuccessResponse(res, {
         pendingRequests,
         pagination: {
@@ -101,14 +103,13 @@ export const getPendingRequest = async (req: Request, res: Response) => {
 
 // ✅ Get History Requests
 export const getHistoryRequest = async (req: Request, res: Response) => {
-    // 1. استخراج معاملات البحث والصفحات من الـ query
+    await getRequestsSchema.parseAsync({ query: req.query });
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.max(1, parseInt(req.query.limit as string) || 10);
     const search = (req.query.search as string || '').trim();
 
     const offset = (page - 1) * limit;
 
-    // 2. الشروط (أي حالة غير الـ pending)
     const baseCondition = ne(statusRequest.status, 'pending');
 
     const leaderCondition = req.user?.role === "leader" 
@@ -125,7 +126,6 @@ export const getHistoryRequest = async (req: Request, res: Response) => {
 
     const whereClause = and(baseCondition, leaderCondition, searchCondition);
 
-    // 3. استعلام جلب البيانات التاريخية
     const historyRequests = await db
         .select({
             id: statusRequest.id,
@@ -145,7 +145,6 @@ export const getHistoryRequest = async (req: Request, res: Response) => {
         .limit(limit)
         .offset(offset);
 
-    // 4. استعلام حساب الإجمالي
     const [{ total }] = await db
         .select({ total: count() })
         .from(statusRequest)
@@ -155,7 +154,6 @@ export const getHistoryRequest = async (req: Request, res: Response) => {
 
     const totalPages = Math.ceil(total / limit);
 
-    // 5. إرسال الاستجابة
     SuccessResponse(res, {
         historyRequests,
         pagination: {
@@ -173,7 +171,7 @@ export const getHistoryRequest = async (req: Request, res: Response) => {
 export const changeStatus = async (req: Request, res: Response) => {
     const validated = await requestIdSchema.parseAsync({ params: req.params, body: req.body });
     const id = validated.params.id;
-    const status = validated.body.status; // القيمة إما 'approve' أو 'reject'
+    const status = validated.body.status;
 
     const existRequest = await db.select({
         id: statusRequest.id,
@@ -191,26 +189,17 @@ export const changeStatus = async (req: Request, res: Response) => {
     await db.update(statusRequest)
         .set({ status })
         .where(eq(statusRequest.id, id));
-    if(status === "approve") { 
+    if (status === "approve") { 
         const visitUpdateData: any = { status: existRequest[0].to };
         
         if (existRequest[0].to === "sales" || existRequest[0].to === "delivered") {
             const visit = await db.select().from(visits).where(eq(visits.id, existRequest[0].visitId)).limit(1);
-            if (visit[0] && visit[0].product_id && visit[0].duration) {
-                const product = await db.select().from(products).where(eq(products.id, visit[0].product_id)).limit(1);
-                if (product[0] && product[0].points) {
-                    let pointsData = product[0].points;
-                    if (typeof pointsData === 'string') {
-                        try { pointsData = JSON.parse(pointsData); } catch(e) { pointsData = []; }
-                    }
-                    if (Array.isArray(pointsData)) {
-                        const pointEntry = pointsData.find((p: any) => p.duration === visit[0].duration);
-                        if (pointEntry) {
-                            visitUpdateData.points = pointEntry.point;
-                        }
-                    }
-                }
+            if (visit[0] && visit[0].products) {
+                const parsedProducts = parseProductsArray(visit[0].products);
+                visitUpdateData.points = await calculatePointsForProducts(parsedProducts);
             }
+        } else {
+            visitUpdateData.points = 0;
         }
         
         await db.update(visits)

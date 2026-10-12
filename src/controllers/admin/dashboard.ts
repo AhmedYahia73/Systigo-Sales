@@ -7,6 +7,14 @@ import { BadRequest } from "../../Errors/BadRequest";
 import { and, or, inArray, eq, gte, lte, gt, lt, count, sql, SQL } from "drizzle-orm";
 import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound"; 
+import { z } from "zod";
+
+export const dashboardQuerySchema = z.object({
+    query: z.object({
+        from: z.string().optional(),
+        to: z.string().optional(),
+    }),
+});
   
 // ==========================================
 // 🎮 Controllers
@@ -19,8 +27,9 @@ export const viewDashboard = async (req: Request, res: Response) => {
         throw new BadRequest("User not authenticated.");
     }
 
+    const validated = await dashboardQuerySchema.parseAsync({ query: req.query });
     // 1. استخراج الفلترة بالتواريخ من query parameters
-    const { from, to } = req.query as { from?: string; to?: string };
+    const { from, to } = validated.query;
 
     // إعداد شروط التاريخ لجدول الزيارات (visits.createdAt)
     const visitDateConditions = [];

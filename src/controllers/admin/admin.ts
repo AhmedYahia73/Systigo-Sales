@@ -65,6 +65,14 @@ export const adminIdSchema = z.object({
   }),
 });
 
+export const getAllAdminSchema = z.object({
+  query: z.object({
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+    search: z.string().optional(),
+  }),
+});
+
 
 // ==========================================
 // 🎮 Controllers
@@ -73,6 +81,7 @@ export const adminIdSchema = z.object({
 // ✅ Get All Admins
 
 export const getAllAdmin = async (req: Request, res: Response) => {
+    await getAllAdminSchema.parseAsync({ query: req.query });
     // استقبال معايير الـ Pagination والبحث
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;

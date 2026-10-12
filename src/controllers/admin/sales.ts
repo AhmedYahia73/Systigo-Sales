@@ -75,6 +75,17 @@ export const salesIdSchema = z.object({
   }),
 });
 
+export const getAllSalesSchema = z.object({
+  query: z.object({
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+    search: z.string().optional(),
+    leader_id: z.string().uuid().optional(),
+    months: z.string().optional(),
+    year: z.coerce.number().int().optional(),
+  }),
+});
+
 
 // ==========================================
 // 🎮 Controllers
@@ -84,6 +95,7 @@ export const salesIdSchema = z.object({
 
 // ✅ Get All Sales (للـ Organization الحالية مع الـ Targets الخاصة بهم)
 export const getAllSales = async (req: Request, res: Response) => {
+    await getAllSalesSchema.parseAsync({ query: req.query });
     const userRole = req.user?.role;
     const userId = req.user?.id;
 

@@ -1,14 +1,110 @@
 import { Request, Response } from "express";
 import { db } from "../../models/db";
-import { users, visits, visitStatus, statusRequest, wishList, products } from "../../models/schema"; 
+import { users, visits, visitStatus, statusRequest, wishList, products, leads } from "../../models/schema"; 
 import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound";
 import { BadRequest } from "../../Errors/BadRequest";
-import { string, z } from "zod";
+import { z } from "zod";
 import { SQL, and, or, eq, like, inArray, count, gte, lte, desc, ne, sql } from 'drizzle-orm';
+
+// ==========================================
+// 🛠️ Helpers for Multi-Products & Points
+// ==========================================
+
+export type VisitProductItem = {
+    product_id: string;
+    duration: string;
+};
+
+export const parseProductsArray = (raw: any): VisitProductItem[] => {
+    if (!raw) return [];
+    let parsed = raw;
+    if (typeof parsed === "string") {
+        try {
+            parsed = JSON.parse(parsed);
+        } catch (e) {
+            return [];
+        }
+    }
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+        .filter((item: any) => item && typeof item.product_id === "string" && item.product_id.trim() !== "")
+        .map((item: any) => ({
+            product_id: item.product_id,
+            duration: item.duration || "",
+        }));
+};
+
+export const calculatePointsForProducts = async (items: VisitProductItem[]): Promise<number> => {
+    const validItems = parseProductsArray(items);
+    if (validItems.length === 0) return 0;
+
+    const productIds = Array.from(new Set(validItems.map((i) => i.product_id)));
+    const dbProducts = await db
+        .select()
+        .from(products)
+        .where(inArray(products.id, productIds));
+
+    const productMap = new Map(dbProducts.map((p) => [p.id, p]));
+    let totalPoints = 0;
+
+    for (const item of validItems) {
+        const prod = productMap.get(item.product_id);
+        if (prod && prod.points) {
+            let pointsData: any = prod.points;
+            if (typeof pointsData === "string") {
+                try {
+                    pointsData = JSON.parse(pointsData);
+                } catch (e) {
+                    pointsData = [];
+                }
+            }
+            if (Array.isArray(pointsData)) {
+                const pointEntry = pointsData.find((p: any) => p.duration === item.duration);
+                if (pointEntry && pointEntry.point !== undefined) {
+                    totalPoints += Number(pointEntry.point) || 0;
+                }
+            }
+        }
+    }
+
+    return totalPoints;
+};
+
+export const enrichRecordsWithProducts = async <T extends { products?: any }>(records: T[]) => {
+    if (records.length === 0) return [];
+
+    const allProducts = await db
+        .select({ id: products.id, name: products.name })
+        .from(products);
+    const productNameMap = new Map(allProducts.map((p) => [p.id, p.name]));
+
+    return records.map((record) => {
+        const parsedProducts = parseProductsArray(record.products).map((item) => ({
+            ...item,
+            product_name: productNameMap.get(item.product_id) || "",
+        }));
+        const productSummary = parsedProducts
+            .map((p) => (p.product_name ? (p.duration ? `${p.product_name} (${p.duration})` : p.product_name) : ""))
+            .filter(Boolean)
+            .join(", ");
+
+        return {
+            ...record,
+            products: parsedProducts,
+            product: productSummary || null,
+        };
+    });
+};
+
 // ==========================================
 // 🛡️ Zod Validation Schemas
 // ==========================================
+
+const visitProductItemSchema = z.object({
+    product_id: z.string({ required_error: "Product ID is required" }).min(1, "Product ID cannot be empty"),
+    duration: z.string().optional().default(""),
+});
 
 export const createVisitSchema = (userRole?: string) => {
     return z.object({
@@ -56,6 +152,8 @@ export const createVisitSchema = (userRole?: string) => {
             sales_id: userRole === "sales" || userRole === "leader"
                 ? z.string().uuid().optional()
                 : z.string({ required_error: "Sales ID is required" }),
+            products: z.array(visitProductItemSchema).nullable().optional(),
+            // Backward compatibility if single product_id/duration sent
             product_id: z.string().nullable().optional(),
             duration: z.string().nullable().optional(),
         }),
@@ -78,6 +176,7 @@ export const updateVisitSchema = z.object({
         status: z.enum(["visit", "sales", "delivered"]).optional(),
         status_id: z.string().nullable().optional(),
         sales_id: z.string().nullable().optional(),
+        products: z.array(visitProductItemSchema).nullable().optional(),
         product_id: z.string().nullable().optional(),
         duration: z.string().nullable().optional(),
     }),
@@ -89,26 +188,39 @@ export const VisitIdSchema = z.object({
     }),
 }); 
 
+export const getAllVisitsSchema = z.object({
+    query: z.object({
+        page: z.coerce.number().int().positive().optional(),
+        limit: z.coerce.number().int().positive().optional(),
+        search: z.string().optional(),
+        sales_id: z.string().optional(),
+        status_id: z.string().optional(),
+        from: z.string().optional(),
+        to: z.string().optional(),
+        months: z.string().optional(),
+        year: z.coerce.number().int().optional(),
+    }),
+});
+
 
 // ==========================================
 // 🎮 Controllers
 // ==========================================
 
-// ✅ Get All Visitsexport 
+// ✅ Get All Visits
 export const getAllVisits = async (req: Request, res: Response) => {  
+    await getAllVisitsSchema.parseAsync({ query: req.query });
     const userRole = req.user?.role;
     const userId = req.user?.id;
     const querySalesId = req.query.sales_id as string;
     const queryStatusId = req.query.status_id as string;
 
-    // استقبال معايير الـ Pagination والبحث
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const search = (req.query.search as string) || '';
     
-    // استقبال معايير فلترة التاريخ (صيغة المتوقع: YYYY-MM-DD)
-    const fromDateStr = req.query.from as string; // مثلاً: 2026-05-05
-    const toDateStr = req.query.to as string;     // مثلاً: 2026-05-05
+    const fromDateStr = req.query.from as string;
+    const toDateStr = req.query.to as string;
 
     const offset = (page - 1) * limit;
 
@@ -119,7 +231,7 @@ export const getAllVisits = async (req: Request, res: Response) => {
     if (queryStatusId) {
         whereConditions.push(eq(visits.status_id, queryStatusId));
     }
-    // 1. تطبيق الصلاحيات والفلترة الذكية لـ Drizzle
+
     if (userRole === "admin") {
         if (querySalesId) {
             whereConditions.push(eq(visits.sales_id, querySalesId));
@@ -156,24 +268,21 @@ export const getAllVisits = async (req: Request, res: Response) => {
         throw new BadRequest("Unauthorized role");
     }
 
-    // 2. تطبيق البحث (Search) بناءً على الاسم، الإيميل، أو الهاتف
     if (search) {
         const searchPattern = `%${search}%`;
         whereConditions.push(
             or(
-                like(visits.name, searchPattern),         // اسم العميل/الزيارة
-                like(visits.owner_name, searchPattern),   // اسم المالك
-                like(visits.phone, searchPattern),        // هاتف العميل/الزيارة
-                like(visits.owner_phone, searchPattern),  // هاتف المالك
-                like(users.name, searchPattern),          // اسم المندوب
-                like(users.email, searchPattern),         // إيميل المندوب
-                like(users.phone, searchPattern)          // هاتف المندوب
+                like(visits.name, searchPattern),
+                like(visits.owner_name, searchPattern),
+                like(visits.phone, searchPattern),
+                like(visits.owner_phone, searchPattern),
+                like(users.name, searchPattern),
+                like(users.email, searchPattern),
+                like(users.phone, searchPattern)
             ) as SQL
         );
     }
 
-    // 3. تطبيق الفلترة بالتاريخ بدون وقت (Date-only filter)
-    // نستخدم الكائنات الافتراضية للوقت للتأكد من جلب اليوم كاملاً (من 00:00:00 إلى 23:59:59)
     if (fromDateStr) {
         const fromDate = new Date(`${fromDateStr}T00:00:00.000Z`);
         if (!isNaN(fromDate.getTime())) {
@@ -210,14 +319,14 @@ export const getAllVisits = async (req: Request, res: Response) => {
             address: visits.address,
             notes: visits.notes,
             phone: visits.phone,
+            points: visits.points,
             status: visits.status,
             visit_status: visitStatus.name,
             status_id: visits.status_id,
             sales_id: users.id,
             sales: users.name,
             sales_phone: users.phone,
-            product_id: visits.product_id,
-            duration: visits.duration,
+            products: visits.products,
             createdAt: sql<string>`DATE_FORMAT(${visits.createdAt}, '%Y-%m-%d')`,
         })
         .from(visits)
@@ -226,7 +335,6 @@ export const getAllVisits = async (req: Request, res: Response) => {
         .orderBy(desc(visits.createdAt))
         .$dynamic();
 
-    // 5. استعلام لحساب العدد الإجمالي متوافق مع الفلاتر (Count Query)
     let countQuery = db
         .select({ total: count() })
         .from(visits)
@@ -234,25 +342,23 @@ export const getAllVisits = async (req: Request, res: Response) => {
         .leftJoin(visitStatus, eq(visits.status_id, visitStatus.id))
         .$dynamic();
 
-    // ربط الشروط بالاستعلامات
     if (whereConditions.length > 0) {
         baseQuery = baseQuery.where(and(...whereConditions));
         countQuery = countQuery.where(and(...whereConditions));
     }
 
-    // تنفيذ الاستعلامين معاً بالتوازي لتحسين الأداء
     const [allVisitsRaw, [{ total: totalCount }]] = await Promise.all([
         baseQuery.limit(limit).offset(offset),
         countQuery
     ]);
 
-    // إضافة رابط الخريطة تلقائياً لكل زيارة
-    const allVisits = allVisitsRaw.map((visit) => ({
+    const enrichedVisits = await enrichRecordsWithProducts(allVisitsRaw);
+
+    const allVisits = enrichedVisits.map((visit) => ({
         ...visit,
         map_link: `https://www.google.com/maps/search/?api=1&query=${visit.lat},${visit.lng}`
     }));
 
-    // إرسال النتيجة مع معلومات الـ pagination الكاملة
     SuccessResponse(res, { 
         allVisits,
         pagination: {
@@ -264,21 +370,20 @@ export const getAllVisits = async (req: Request, res: Response) => {
     }, 200);
 };
 
-// ✅ Get All Visitsexport 
+// ✅ Get All Sales (Visits with status != 'visit')
 export const getAllSales = async (req: Request, res: Response) => {  
+    await getAllVisitsSchema.parseAsync({ query: req.query });
     const userRole = req.user?.role;
     const userId = req.user?.id;
     const querySalesId = req.query.sales_id as string;
     const queryStatusId = req.query.status_id as string;
 
-    // استقبال معايير الـ Pagination والبحث
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const search = (req.query.search as string) || '';
     
-    // استقبال معايير فلترة التاريخ (صيغة المتوقع: YYYY-MM-DD)
-    const fromDateStr = req.query.from as string; // مثلاً: 2026-05-05
-    const toDateStr = req.query.to as string;     // مثلاً: 2026-05-05
+    const fromDateStr = req.query.from as string;
+    const toDateStr = req.query.to as string;
 
     const offset = (page - 1) * limit;
 
@@ -288,7 +393,7 @@ export const getAllSales = async (req: Request, res: Response) => {
     if (queryStatusId) {
         whereConditions.push(eq(visits.status_id, queryStatusId));
     }
-    // 1. تطبيق الصلاحيات والفلترة الذكية لـ Drizzle
+
     if (userRole === "admin") {
         if (querySalesId) {
             whereConditions.push(eq(visits.sales_id, querySalesId));
@@ -325,24 +430,21 @@ export const getAllSales = async (req: Request, res: Response) => {
         throw new BadRequest("Unauthorized role");
     }
 
-    // 2. تطبيق البحث (Search) بناءً على الاسم، الإيميل، أو الهاتف
     if (search) {
         const searchPattern = `%${search}%`;
         whereConditions.push(
             or(
-                like(visits.name, searchPattern),         // اسم العميل/الزيارة
-                like(visits.owner_name, searchPattern),   // اسم المالك
-                like(visits.phone, searchPattern),        // هاتف العميل/الزيارة
-                like(visits.owner_phone, searchPattern),  // هاتف المالك
-                like(users.name, searchPattern),          // اسم المندوب
-                like(users.email, searchPattern),         // إيميل المندوب
-                like(users.phone, searchPattern)          // هاتف المندوب
+                like(visits.name, searchPattern),
+                like(visits.owner_name, searchPattern),
+                like(visits.phone, searchPattern),
+                like(visits.owner_phone, searchPattern),
+                like(users.name, searchPattern),
+                like(users.email, searchPattern),
+                like(users.phone, searchPattern)
             ) as SQL
         );
     }
 
-    // 3. تطبيق الفلترة بالتاريخ بدون وقت (Date-only filter)
-    // نستخدم الكائنات الافتراضية للوقت للتأكد من جلب اليوم كاملاً (من 00:00:00 إلى 23:59:59)
     if (fromDateStr) {
         const fromDate = new Date(`${fromDateStr}T00:00:00.000Z`);
         if (!isNaN(fromDate.getTime())) {
@@ -368,7 +470,6 @@ export const getAllSales = async (req: Request, res: Response) => {
         }
     }
 
-    // 4. بناء الاستعلام الأساسي (Base Query)
     let baseQuery = db
         .select({
             id: visits.id, 
@@ -380,25 +481,22 @@ export const getAllSales = async (req: Request, res: Response) => {
             address: visits.address,
             notes: visits.notes,
             phone: visits.phone,
+            points: visits.points,
             status: visits.status,
             visit_status: visitStatus.name,
             status_id: visits.status_id,
             sales_id: users.id,
             sales: users.name,
             sales_phone: users.phone,
-            product_id: visits.product_id,
-            duration: visits.duration,
-            product: products.name,
+            products: visits.products,
             createdAt: visits.createdAt
         })
         .from(visits)
         .leftJoin(users, eq(visits.sales_id, users.id))
         .leftJoin(visitStatus, eq(visits.status_id, visitStatus.id))
-        .leftJoin(products, eq(visits.product_id, products.id))
         .orderBy(desc(visits.createdAt))
         .$dynamic();
 
-    // 5. استعلام لحساب العدد الإجمالي متوافق مع الفلاتر (Count Query)
     let countQuery = db
         .select({ total: count() })
         .from(visits)
@@ -406,25 +504,23 @@ export const getAllSales = async (req: Request, res: Response) => {
         .leftJoin(visitStatus, eq(visits.status_id, visitStatus.id))
         .$dynamic();
 
-    // ربط الشروط بالاستعلامات
     if (whereConditions.length > 0) {
         baseQuery = baseQuery.where(and(...whereConditions));
         countQuery = countQuery.where(and(...whereConditions));
     }
 
-    // تنفيذ الاستعلامين معاً بالتوازي لتحسين الأداء
     const [allVisitsRaw, [{ total: totalCount }]] = await Promise.all([
         baseQuery.limit(limit).offset(offset),
         countQuery
     ]);
 
-    // إضافة رابط الخريطة تلقائياً لكل زيارة
-    const allVisits = allVisitsRaw.map((visit) => ({
+    const enrichedVisits = await enrichRecordsWithProducts(allVisitsRaw);
+
+    const allVisits = enrichedVisits.map((visit) => ({
         ...visit,
         map_link: `https://www.google.com/maps/search/?api=1&query=${visit.lat},${visit.lng}`
     }));
 
-    // إرسال النتيجة مع معلومات الـ pagination الكاملة
     SuccessResponse(res, { 
         allVisits,
         pagination: {
@@ -437,26 +533,27 @@ export const getAllSales = async (req: Request, res: Response) => {
 };
 
 export const getVisitsCounts = async (req: Request, res: Response) => {
+    await getAllVisitsSchema.parseAsync({ query: req.query });
     const userRole = req.user?.role;
     const userId = req.user?.id;
     const querySalesId = req.query.sales_id as string;
     const queryStatusId = req.query.status_id as string;
 
-    // استقبال معايير البحث والتواريخ
     const search = (req.query.search as string) || '';
-    const fromDateStr = req.query.from as string; // مثلاً: 2026-05-05
-    const toDateStr = req.query.to as string;   // مثلاً: 2026-05-05
+    const fromDateStr = req.query.from as string;
+    const toDateStr = req.query.to as string;
 
     let whereConditions: SQL[] = [];
+    let leadsWhereConditions: SQL[] = [];
 
     if (queryStatusId) {
         whereConditions.push(eq(visits.status_id, queryStatusId));
     }
 
-    // 1. تطبيق الصلاحيات والفلترة لـ Drizzle
     if (userRole === "admin") {
         if (querySalesId) {
             whereConditions.push(eq(visits.sales_id, querySalesId));
+            leadsWhereConditions.push(eq(leads.sales_id, querySalesId));
         }
     } else if (userRole === "leader") {
         const teamSales = await db
@@ -470,6 +567,18 @@ export const getVisitsCounts = async (req: Request, res: Response) => {
             );
         
         const salesIds = teamSales.map(s => s.id);
+        const strictTeamIds = (
+            await db
+                .select({ id: users.id })
+                .from(users)
+                .where(and(eq(users.leader_id, userId!), eq(users.role, "sales")))
+        ).map(s => s.id);
+
+        if (strictTeamIds.length > 0) {
+            leadsWhereConditions.push(inArray(leads.sales_id, strictTeamIds));
+        } else {
+            leadsWhereConditions.push(sql`1 = 0`);
+        }
 
         if (querySalesId) {
             if (salesIds.includes(querySalesId)) {
@@ -481,16 +590,16 @@ export const getVisitsCounts = async (req: Request, res: Response) => {
             if (salesIds.length > 0) {
                 whereConditions.push(inArray(visits.sales_id, salesIds));
             } else {
-                return SuccessResponse(res, { visitCount: 0, notVisitCount: 0, total: 0 }, 200);
+                return SuccessResponse(res, { visitCount: 0, notVisitCount: 0, total: 0, leadsCount: 0 }, 200);
             }
         }
     } else if (userRole === "sales") {
         whereConditions.push(eq(visits.sales_id, userId!));
+        leadsWhereConditions.push(eq(leads.sales_id, userId!));
     } else {
         throw new BadRequest("Unauthorized role");
     }
 
-    // 2. تطبيق البحث (Search)
     if (search) {
         const searchPattern = `%${search}%`;
         whereConditions.push(
@@ -504,7 +613,6 @@ export const getVisitsCounts = async (req: Request, res: Response) => {
         );
     }
 
-    // 3. تطبيق الفلترة بالتاريخ
     if (fromDateStr) {
         const fromDate = new Date(`${fromDateStr}T00:00:00.000Z`);
         if (!isNaN(fromDate.getTime())) {
@@ -519,7 +627,6 @@ export const getVisitsCounts = async (req: Request, res: Response) => {
         }
     }
 
-    // 4. استعلام واحد لحساب العدّين (visit و not visit) بناءً على الفلاتر
     const [countsResult] = await db
         .select({
             visitCount: sql<number>`COALESCE(COUNT(CASE WHEN ${visits.status} = 'visit' THEN 1 END), 0)`,
@@ -539,16 +646,22 @@ export const getVisitsCounts = async (req: Request, res: Response) => {
             })
             .from(wishList)
     ).length;
-    // 5. إرسال الأعداد فقط في الاستجابة
+
+    const [{ totalLeads }] = await db
+        .select({ totalLeads: count() })
+        .from(leads)
+        .where(leadsWhereConditions.length > 0 ? and(...leadsWhereConditions) : undefined);
+
     SuccessResponse(res, { 
-        visitCount,        // عدد الزيارات التي حالتها تساوي "visit"
-        salesCount: notVisitCount,     // عدد الزيارات التي حالتها لا تساوي "visit"
-        total: visitCount + notVisitCount, // الإجمالي
-        wishListsCount
+        visitCount,
+        salesCount: notVisitCount,
+        total: visitCount + notVisitCount,
+        wishListsCount,
+        leadsCount: Number(totalLeads || 0),
     }, 200);
 };
 
-// ✅ Get Active Visit Statuses
+// ✅ Get Active Visit Statuses & Sales List
 export const lists = async (req: Request, res: Response) => { 
     const visit_status = await db
         .select({
@@ -558,39 +671,37 @@ export const lists = async (req: Request, res: Response) => {
         .from(visitStatus)
         .where(eq(visitStatus.status, true));  
     const userId = req.user?.id;
-  // 1. تحديد نوع البيانات المتوقع من الاستعلام
-type SalesUser = {
-  id: typeof users.$inferSelect.id;
-  name: typeof users.$inferSelect.name;
-  phone: typeof users.$inferSelect.phone;
-};
 
-    // 2. تعريف المتغير بالنوع الصحيح
+    type SalesUser = {
+        id: typeof users.$inferSelect.id;
+        name: typeof users.$inferSelect.name;
+        phone: typeof users.$inferSelect.phone;
+    };
+
     let sales: SalesUser[] = [];
- 
 
     if (req.user?.role === "leader" && userId) {
-    sales = await db
-        .select({
-        id: users.id,
-        name: users.name,
-        phone: users.phone,
-        })
-        .from(users)
-        .where(
-        or(
-            and(eq(users.leader_id, userId), eq(users.role, "sales")),
-            eq(users.id, userId)
-        )
-        );
+        sales = await db
+            .select({
+                id: users.id,
+                name: users.name,
+                phone: users.phone,
+            })
+            .from(users)
+            .where(
+                or(
+                    and(eq(users.leader_id, userId), eq(users.role, "sales")),
+                    eq(users.id, userId)
+                )
+            );
     } else {
-    sales = await db
-        .select({
-        id: users.id,
-        name: users.name,
-        phone: users.phone,
-        })
-        .from(users);
+        sales = await db
+            .select({
+                id: users.id,
+                name: users.name,
+                phone: users.phone,
+            })
+            .from(users);
     }
     SuccessResponse(res, { visit_status, sales }, 200);
 }; 
@@ -611,11 +722,11 @@ export const getVisitsById = async (req: Request, res: Response) => {
             address: visits.address,
             notes: visits.notes,
             phone: visits.phone,
+            points: visits.points,
             status: visits.status,
             status_id: visits.status_id,
             sales_id: visits.sales_id,
-            product_id: visits.product_id,
-            duration: visits.duration,
+            products: visits.products,
         })
         .from(visits) 
         .where(eq(visits.id, id))
@@ -625,13 +736,14 @@ export const getVisitsById = async (req: Request, res: Response) => {
         throw new NotFound("Visit not found");
     }
 
-    // التحقق من الصلاحيات للوصول لزيارة معينة
     if (req.user?.role === "sales" && visitRaw[0].sales_id !== req.user.id) {
         throw new BadRequest("You do not have permission to access this visit.");
     }
 
+    const [enriched] = await enrichRecordsWithProducts([visitRaw[0]]);
+
     const visit = {
-        ...visitRaw[0],
+        ...enriched,
         map_link: `https://www.google.com/maps/search/?api=1&query=${visitRaw[0].lat},${visitRaw[0].lng}`
     };
 
@@ -643,23 +755,18 @@ export const createVisits = async (req: Request, res: Response) => {
     const validated = await createVisitSchema(req.user?.role).parseAsync({ body: req.body });
     const { lat, lng, name, address, notes, phone, status_id, owner_name, owner_phone } = validated.body;
     
-    // 1. تحديد قيمة الـ status بشكل آمن حسب الدور
     let status = "visit";
     if ((req.user?.role === "leader" || req.user?.role === "admin") && req.body.status) {
         status = req.body.status;
     }
 
-    // 2. تحديد الـ sales_id المخصص للزيارة
     let sales_id: any;
 
     if (req.user?.role === "sales") {
-        // موظف المبيعات تسند له الزيارة تلقائياً
         sales_id = req.user.id;
     } else if (req.user?.role === "leader") {
-        // القائد يمكنه إسنادها لموظف مبيعات أو لنفسه إذا لم يحدد sales_id
         sales_id = validated.body.sales_id || req.user.id;
     } else {
-        // الأدوار الأخرى (مثل Admin) يجب أن توفر sales_id في الـ body
         sales_id = validated.body.sales_id;
     }
 
@@ -667,7 +774,6 @@ export const createVisits = async (req: Request, res: Response) => {
         throw new BadRequest("sales_id is required.");
     }
 
-    // 🔍 3. التحقق من صحة وجود الـ sales_id في جدول المستخدمين
     const salesExist = await db
         .select({ id: users.id })
         .from(users)
@@ -683,7 +789,6 @@ export const createVisits = async (req: Request, res: Response) => {
         throw new BadRequest("The assigned sales_id does not exist or user is not a sales member/leader.");
     }
 
-    // 🔍 4. التحقق من صحة وجود الـ status_id في جدول الحالات إن أُرسل
     if (status_id) {
         const statusExist = await db
             .select({ id: visitStatus.id })
@@ -696,7 +801,16 @@ export const createVisits = async (req: Request, res: Response) => {
         }
     }
 
-    // 5. إنشاء الزيارة في قاعدة البيانات
+    let visitProducts: VisitProductItem[] = [];
+    if (validated.body.products && Array.isArray(validated.body.products)) {
+        visitProducts = parseProductsArray(validated.body.products);
+    } else if (validated.body.product_id) {
+        visitProducts = [{
+            product_id: validated.body.product_id,
+            duration: validated.body.duration || "",
+        }];
+    }
+
     const insertData: any = { 
         lat,
         lng,
@@ -709,25 +823,12 @@ export const createVisits = async (req: Request, res: Response) => {
         status: status as any, 
         status_id: status_id || null,
         sales_id,
+        products: visitProducts,
+        points: 0,
     };
     
-    if (validated.body.product_id !== undefined) insertData.product_id = validated.body.product_id;
-    if (validated.body.duration !== undefined) insertData.duration = validated.body.duration;
-    
-    if ((status === "sales" || status === "delivered") && validated.body.product_id && validated.body.duration && (req.user?.role === "leader" || req.user?.role === "admin")) {
-        const product = await db.select().from(products).where(eq(products.id, validated.body.product_id)).limit(1);
-        if (product[0] && product[0].points) {
-            let pointsData = product[0].points;
-            if (typeof pointsData === 'string') {
-                try { pointsData = JSON.parse(pointsData); } catch(e) { pointsData = []; }
-            }
-            if (Array.isArray(pointsData)) {
-                const pointEntry = pointsData.find((p: any) => p.duration === validated.body.duration);
-                if (pointEntry) {
-                    insertData.points = pointEntry.point;
-                }
-            }
-        }
+    if ((status === "sales" || status === "delivered") && visitProducts.length > 0 && (req.user?.role === "leader" || req.user?.role === "admin")) {
+        insertData.points = await calculatePointsForProducts(visitProducts);
     }
 
     await db.insert(visits).values(insertData);
@@ -744,7 +845,6 @@ export const updateVisits = async (req: Request, res: Response) => {
     const { id } = validated.params;
     const { lat, lng, name, address, notes, phone, status, status_id, owner_name, owner_phone } = validated.body;
   
-    // 🔍 1. التأكد من وجود الزيارة الأصلية
     const existingVisit = await db
         .select()
         .from(visits)
@@ -757,14 +857,12 @@ export const updateVisits = async (req: Request, res: Response) => {
         throw new NotFound("Visit not found");
     }
 
-    // 🔒 منع Sales من تعديل زيارة لا تخصه
     if (req.user?.role === "sales" && currentVisit.sales_id !== req.user.id) {
         throw new BadRequest("You do not have permission to modify this visit.");
     }
 
     let sales_id = req.body.sales_id;
 
-    // 🔍 2. التحقق من وجود الـ sales_id الجديد إذا تم تعيينه أو تعديله
     if (sales_id !== undefined && sales_id !== null) {
         const salesExist = await db
             .select({ id: users.id })
@@ -778,7 +876,6 @@ export const updateVisits = async (req: Request, res: Response) => {
         }
     }
 
-    // 🔍 3. التحقق من وجود الـ status_id الجديد إذا تم تعديله
     if (status_id !== undefined && status_id !== null) {
         const statusExist = await db
             .select({ id: visitStatus.id })
@@ -802,17 +899,26 @@ export const updateVisits = async (req: Request, res: Response) => {
     if (phone !== undefined) updateData.phone = phone;
     if (status_id !== undefined) updateData.status_id = status_id;
     if (sales_id !== undefined && req.user?.role !== "sales") updateData.sales_id = sales_id;
-    if (validated.body.product_id !== undefined) updateData.product_id = validated.body.product_id;
-    if (validated.body.duration !== undefined) updateData.duration = validated.body.duration;
 
-    // التعامل مع الـ Status ورتب المستخدمين (Roles)
+    if (validated.body.products !== undefined) {
+        updateData.products = parseProductsArray(validated.body.products);
+    } else if (validated.body.product_id !== undefined && validated.body.product_id) {
+        updateData.products = [{
+            product_id: validated.body.product_id,
+            duration: validated.body.duration || "",
+        }];
+    }
+
+    const effectiveProducts = updateData.products !== undefined
+        ? updateData.products
+        : parseProductsArray(currentVisit.products);
+
     if (status !== undefined) {
         if (req.user?.role === "sales") {
             if (!req.user.id) {
                 throw new BadRequest("User ID is missing.");
             }
 
-            // فحص ما إذا كان هناك طلب معلق لنفس الحالة سلفًا
             const request_item = await db
                 .select({ id: statusRequest.id })
                 .from(statusRequest)
@@ -827,7 +933,6 @@ export const updateVisits = async (req: Request, res: Response) => {
                 )
                 .limit(1);
 
-            // إذا لم يكن هناك طلب معلق، نقوم بإنشائه
             if (!request_item[0]) {
                 await db.insert(statusRequest).values({
                     visitId: currentVisit.id,
@@ -838,34 +943,25 @@ export const updateVisits = async (req: Request, res: Response) => {
                 });
             }
         } else {
-            // الأدوار الأخرى (Admin / Leader) -> تغيير مباشر
             updateData.status = status;
             
-            if ((status === "sales" || status === "delivered") && validated.body.product_id && validated.body.duration) {
-                const product = await db.select().from(products).where(eq(products.id, validated.body.product_id)).limit(1);
-                if (product[0] && product[0].points) {
-                    let pointsData = product[0].points;
-                    if (typeof pointsData === 'string') {
-                        try { pointsData = JSON.parse(pointsData); } catch(e) { pointsData = []; }
-                    }
-                    if (Array.isArray(pointsData)) {
-                        const pointEntry = pointsData.find((p: any) => p.duration === validated.body.duration);
-                        if (pointEntry) {
-                            updateData.points = pointEntry.point;
-                        }
-                    }
-                }
+            if (status === "sales" || status === "delivered") {
+                updateData.points = await calculatePointsForProducts(effectiveProducts);
+            } else {
+                updateData.points = 0;
             }
+        }
+    } else if (updateData.products !== undefined && req.user?.role !== "sales") {
+        if (currentVisit.status === "sales" || currentVisit.status === "delivered") {
+            updateData.points = await calculatePointsForProducts(effectiveProducts);
         }
     }
 
-    // شرط التحديث في قاعدة البيانات
     let updateConditions = eq(visits.id, id);
     if (req.user?.role === "sales") {
         updateConditions = and(eq(visits.id, id), eq(visits.sales_id, req.user.id)) as any;
     }
 
-    // تنفيذ الـ Update فقط إذا كان هناك حقول للتعديل تجنباً لأخطاء SQL Syntax
     if (Object.keys(updateData).length > 0) {
         await db.update(visits).set(updateData).where(updateConditions);
     }
@@ -888,13 +984,12 @@ export const deleteVisits = async (req: Request, res: Response) => {
         throw new NotFound("Visit not found");
     }
 
-    // بناء شروط الحذف الآمن في استعلام موحد لمنع تكرار دالة .where() الخاطئ
     let deleteConditions = eq(visits.id, id);
     if (req.user?.role === "leader" || req.user?.role === "sales") {
         deleteConditions = and(eq(visits.id, id), eq(visits.sales_id, req.user.id)) as any;
     }
 
-    const deleteResult = await db.delete(visits).where(deleteConditions);
+    await db.delete(visits).where(deleteConditions);
 
     SuccessResponse(res, { message: "Visit deleted successfully" }, 200);
 };

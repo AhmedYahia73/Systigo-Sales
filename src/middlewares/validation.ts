@@ -20,15 +20,16 @@ function gatherFiles(req: Request): Express.Multer.File[] {
 }
 
 export const validate = (
-  schema: AnyZodObject | ZodEffects<AnyZodObject>
+  schema: AnyZodObject | ZodEffects<AnyZodObject> | ((role?: string) => AnyZodObject | ZodEffects<AnyZodObject>)
 ): RequestHandler => {
-  return async (
+  const handler: any = async (
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
-      await schema.parseAsync({
+      const resolvedSchema = typeof schema === "function" ? schema(req.user?.role) : schema;
+      await resolvedSchema.parseAsync({
         body: req.body,
         query: req.query,
         params: req.params,
@@ -48,4 +49,6 @@ export const validate = (
       next(error);
     }
   };
+  handler.__zodSchema = schema;
+  return handler;
 };

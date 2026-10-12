@@ -49,6 +49,16 @@ export const updateTargetSchema = z.object({
   body: z.object({
     type: z.enum(["visit", "sales", "points"]).optional(),
     name: z.string().min(1, "Name cannot be empty").max(255).optional(),
+    items: z.array(
+      z.object({
+        year: z.number({ required_error: "Year is required" }).int(),
+        month: z.number({ required_error: "Month is required" }).int().min(1).max(12),
+        number: z.number({ required_error: "Monthly target number is required" }).positive(),
+      })
+    ).min(1, "At least one target item is required").optional(),
+    sales: z.array(
+      z.string({ invalid_type_error: "Sales User ID must be a string" }).uuid("Invalid User ID format")
+    ).min(1, "At least one sales user must be assigned").optional(),
   }),
 });
 
@@ -60,7 +70,7 @@ export const targetIdSchema = z.object({
 
 export const getAllTargetsSchema = z.object({
   params: z.object({
-    type: z.enum(["visit", "sales"]).optional(),
+    type: z.enum(["visit", "sales", "points"]).optional(),
   }),
 });
 
@@ -217,7 +227,7 @@ export const updateTargets = async (req: Request, res: Response) => {
     body: req.body 
   });
   const { id } = validated.params;
-  const bodyData = validated.body;
+  const { items, sales, ...targetFields } = validated.body;
 
   const existingTargets = await db
     .select({ id: targets.id })
@@ -230,12 +240,41 @@ export const updateTargets = async (req: Request, res: Response) => {
   }
 
   const updateData = Object.fromEntries(
-    Object.entries(bodyData).filter(([_, value]) => value !== undefined)
+    Object.entries(targetFields).filter(([_, value]) => value !== undefined)
   );
 
-  if (Object.keys(updateData).length > 0) {
-    await db.update(targets).set(updateData).where(eq(targets.id, id));
-  }
+  await db.transaction(async (tx) => {
+    // 1. تحديث بيانات التارجت الأساسية (name, type)
+    if (Object.keys(updateData).length > 0) {
+      await tx.update(targets).set(updateData).where(eq(targets.id, id));
+    }
+
+    // 2. تحديث عناصر التارجت (items) في حال إرسالها
+    if (items !== undefined) {
+      await tx.delete(target_items).where(eq(target_items.target_id, id));
+      if (items.length > 0) {
+        const itemsToInsert = items.map((item) => ({
+          target_id: id,
+          year: item.year,
+          month: item.month,
+          number: item.number,
+        }));
+        await tx.insert(target_items).values(itemsToInsert);
+      }
+    }
+
+    // 3. تحديث الموظفين المسند لهم التارجت (sales) في حال إرسالهم
+    if (sales !== undefined) {
+      await tx.delete(target_sales).where(eq(target_sales.target_id, id));
+      if (sales.length > 0) {
+        const salesToInsert = sales.map((userId) => ({
+          target_id: id,
+          user_id: userId,
+        }));
+        await tx.insert(target_sales).values(salesToInsert);
+      }
+    }
+  });
 
   SuccessResponse(res, { message: "Target updated successfully" }, 200);
 };
