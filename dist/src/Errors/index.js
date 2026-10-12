@@ -1,23 +1,54 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.UnauthorizedError = exports.UniqueConstrainError = exports.NotNullConstrainError = exports.ForeignKeyConstrainError = exports.DatabaseError = exports.AppError = exports.ForbiddenError = exports.ConflictError = exports.ValidationError = exports.NotFound = void 0;
-const NotFound_1 = require("./NotFound");
-Object.defineProperty(exports, "NotFound", { enumerable: true, get: function () { return NotFound_1.NotFound; } });
-const validationError_1 = require("./validationError");
-Object.defineProperty(exports, "ValidationError", { enumerable: true, get: function () { return validationError_1.ValidationError; } });
-const conflictError_1 = require("./conflictError");
-Object.defineProperty(exports, "ConflictError", { enumerable: true, get: function () { return conflictError_1.ConflictError; } });
-const forbiddenError_1 = require("./forbiddenError");
-Object.defineProperty(exports, "ForbiddenError", { enumerable: true, get: function () { return forbiddenError_1.ForbiddenError; } });
-const appError_1 = require("./appError");
-Object.defineProperty(exports, "AppError", { enumerable: true, get: function () { return appError_1.AppError; } });
-const databaseError_1 = require("./databaseError");
-Object.defineProperty(exports, "DatabaseError", { enumerable: true, get: function () { return databaseError_1.DatabaseError; } });
-const foreignKeyConstrainError_1 = require("./foreignKeyConstrainError");
-Object.defineProperty(exports, "ForeignKeyConstrainError", { enumerable: true, get: function () { return foreignKeyConstrainError_1.ForeignKeyConstrainError; } });
-const notNullConstrainError_1 = require("./notNullConstrainError");
-Object.defineProperty(exports, "NotNullConstrainError", { enumerable: true, get: function () { return notNullConstrainError_1.NotNullConstrainError; } });
-const uniqueConstrainError_1 = require("./uniqueConstrainError");
-Object.defineProperty(exports, "UniqueConstrainError", { enumerable: true, get: function () { return uniqueConstrainError_1.UniqueConstrainError; } });
-const unauthorizedError_1 = require("./unauthorizedError");
-Object.defineProperty(exports, "UnauthorizedError", { enumerable: true, get: function () { return unauthorizedError_1.UnauthorizedError; } });
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var stdin_exports = {};
+__export(stdin_exports, {
+  AppError: () => import_appError.AppError,
+  ConflictError: () => import_conflictError.ConflictError,
+  DatabaseError: () => import_databaseError.DatabaseError,
+  ForbiddenError: () => import_forbiddenError.ForbiddenError,
+  ForeignKeyConstrainError: () => import_foreignKeyConstrainError.ForeignKeyConstrainError,
+  NotFound: () => import_NotFound.NotFound,
+  NotNullConstrainError: () => import_notNullConstrainError.NotNullConstrainError,
+  UnauthorizedError: () => import_unauthorizedError.UnauthorizedError,
+  UniqueConstrainError: () => import_uniqueConstrainError.UniqueConstrainError,
+  ValidationError: () => import_validationError.ValidationError
+});
+module.exports = __toCommonJS(stdin_exports);
+var import_NotFound = require("./NotFound");
+var import_validationError = require("./validationError");
+var import_conflictError = require("./conflictError");
+var import_forbiddenError = require("./forbiddenError");
+var import_appError = require("./appError");
+var import_databaseError = require("./databaseError");
+var import_foreignKeyConstrainError = require("./foreignKeyConstrainError");
+var import_notNullConstrainError = require("./notNullConstrainError");
+var import_uniqueConstrainError = require("./uniqueConstrainError");
+var import_unauthorizedError = require("./unauthorizedError");
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  AppError,
+  ConflictError,
+  DatabaseError,
+  ForbiddenError,
+  ForeignKeyConstrainError,
+  NotFound,
+  NotNullConstrainError,
+  UnauthorizedError,
+  UniqueConstrainError,
+  ValidationError
+});

@@ -321,22 +321,36 @@ function registerModuleExports(mod: Record<string, any>) {
     }
 
     const fnSource = Function.prototype.toString.call(exportVal);
-    // Match patterns like:
+    // 1. Match patterns like:
     //   createTargetSchema.parseAsync(...)
     //   createVisitSchema(req.user?.role).parseAsync(...)
-    //   exports.updateAdminSchema.parseAsync(...)
-    const regex = /([a-zA-Z0-9_]+)\s*(?:\([^)]*\))?\s*\.\s*parse(?:Async)?\s*\(/g;
-    let match: RegExpExecArray | null;
-    while ((match = regex.exec(fnSource)) !== null) {
-      const candidateName = match[1];
+    //   (0, exports.createLeadSchema)(role).parseAsync(...)
+    let matchedKey: string | undefined;
+    for (const [candidateName] of localSchemas.entries()) {
+      const idRegex = new RegExp(`\\b${candidateName}\\b`);
+      if (idRegex.test(fnSource)) {
+        matchedKey = candidateName;
+        break;
+      }
+    }
+    if (!matchedKey) {
+      for (const [candidateName] of globalSchemaRegistry.entries()) {
+        const idRegex = new RegExp(`\\b${candidateName}\\b`);
+        if (idRegex.test(fnSource)) {
+          matchedKey = candidateName;
+          break;
+        }
+      }
+    }
+
+    if (matchedKey) {
       const matchedSchema =
-        localSchemas.get(candidateName) || globalSchemaRegistry.get(candidateName);
+        localSchemas.get(matchedKey) || globalSchemaRegistry.get(matchedKey);
       if (matchedSchema) {
         controllerSchemaMap.set(exportVal, {
-          schemaName: candidateName,
+          schemaName: matchedKey,
           schema: matchedSchema,
         });
-        break;
       }
     }
   }
@@ -561,12 +575,14 @@ function findZodSchemaForRoute(routeStack: any[]): { schemaName: string; zodObje
     } else if (typeof originalFn === "function") {
       // 3. Fallback: scan function source directly against globalSchemaRegistry
       const src = Function.prototype.toString.call(originalFn);
-      const match = /([a-zA-Z0-9_]+)\s*(?:\([^)]*\))?\s*\.\s*parse(?:Async)?\s*\(/.exec(src);
-      if (match && globalSchemaRegistry.has(match[1])) {
-        foundEntry = {
-          schemaName: match[1],
-          schema: globalSchemaRegistry.get(match[1]),
-        };
+      for (const [candidateName, candidateSchema] of globalSchemaRegistry.entries()) {
+        if (new RegExp(`\\b${candidateName}\\b`).test(src)) {
+          foundEntry = {
+            schemaName: candidateName,
+            schema: candidateSchema,
+          };
+          break;
+        }
       }
     }
   }
@@ -659,14 +675,25 @@ function buildZodOpenApiSpec(baseSpec: any) {
           const convertedParams = zodFieldToOpenApi(paramsZod);
           const props = convertedParams.schema.properties || {};
           for (const [pKey, pSchema] of Object.entries(props)) {
-            paramNamesSeen.add(`path:${pKey}`);
-            parameters.push({
-              in: "path",
-              name: pKey,
-              required: true,
-              schema: pSchema,
-              description: (pSchema as any).description || `${pKey} parameter`,
-            });
+            if (openApiPath.includes(`{${pKey}}`)) {
+              paramNamesSeen.add(`path:${pKey}`);
+              parameters.push({
+                in: "path",
+                name: pKey,
+                required: true,
+                schema: pSchema,
+                description: (pSchema as any).description || `${pKey} parameter`,
+              });
+            } else {
+              paramNamesSeen.add(`query:${pKey}`);
+              parameters.push({
+                in: "query",
+                name: pKey,
+                required: false,
+                schema: pSchema,
+                description: (pSchema as any).description || `Filter by ${pKey}`,
+              });
+            }
           }
         }
 
@@ -743,6 +770,8 @@ function buildZodOpenApiSpec(baseSpec: any) {
 
         if (requestBody) {
           operation.requestBody = requestBody;
+        } else if (["get", "delete", "head"].includes(method)) {
+          delete operation.requestBody;
         }
 
         if (!operation.responses) {
@@ -836,7 +865,18 @@ const options: swaggerJSDoc.Options = {
 };
 
 export const getSwaggerSpec = () => {
-  const baseSpec = swaggerJSDoc(options);
+  let baseSpec: any = {
+    openapi: "3.0.0",
+    info: options.definition?.info,
+    servers: options.definition?.servers,
+    components: options.definition?.components,
+    paths: {},
+  };
+  try {
+    baseSpec = swaggerJSDoc(options);
+  } catch (err) {
+    console.warn("swaggerJSDoc fallback:", err);
+  }
   return buildZodOpenApiSpec(baseSpec);
 };
 
@@ -856,7 +896,6 @@ export const setupSwagger = (app: Express) => {
     swaggerUi.setup(swaggerSpec, {
       explorer: true,
       swaggerOptions: {
-        url: "/api-docs.json",
         persistAuthorization: true,
         docExpansion: "list",
       },

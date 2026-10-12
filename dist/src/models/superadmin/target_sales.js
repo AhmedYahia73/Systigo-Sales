@@ -1,49 +1,37 @@
-"use strict";
-// src/models/schema/target_sales.ts
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.target_sales = void 0;
-const mysql_core_1 = require("drizzle-orm/mysql-core");
-const drizzle_orm_1 = require("drizzle-orm");
-const targets_1 = require("./targets"); // تأكد أن جدول targets الرئيسي معرف في ملف "./targets"
-const users_1 = require("./users");
-/**
- * @openapi
- * components:
- *   schemas:
- *     TargetSale:
- *       type: object
- *       required:
- *         - target_id
- *         - user_id
- *       properties:
- *         id:
- *           type: string
- *           format: uuid
- *           description: Auto-generated UUID for the target sale assignment
- *           example: "s1111111-1111-1111-1111-111111111111"
- *         target_id:
- *           type: string
- *           format: uuid
- *           description: Foreign key linking to the target
- *           example: "t1111111-1111-1111-1111-111111111111"
- *         user_id:
- *           type: string
- *           format: uuid
- *           description: Foreign key linking to the assigned sales user
- *           example: "u1111111-1111-1111-1111-111111111111"
- *         createdAt:
- *           type: string
- *           format: date-time
- *           description: Assignment creation timestamp
- *         updatedAt:
- *           type: string
- *           format: date-time
- *           description: Last update timestamp
- */
-exports.target_sales = (0, mysql_core_1.mysqlTable)("target_sales", {
-    id: (0, mysql_core_1.char)("id", { length: 36 }).primaryKey().default((0, drizzle_orm_1.sql) `(UUID())`),
-    target_id: (0, mysql_core_1.char)("target_id", { length: 36 }).references(() => targets_1.targets.id, { onDelete: "cascade" }),
-    user_id: (0, mysql_core_1.char)("user_id", { length: 36 }).references(() => users_1.users.id, { onDelete: "cascade" }),
-    createdAt: (0, mysql_core_1.timestamp)("created_at").defaultNow(),
-    updatedAt: (0, mysql_core_1.timestamp)("updated_at").defaultNow().onUpdateNow(),
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var stdin_exports = {};
+__export(stdin_exports, {
+  target_sales: () => target_sales
+});
+module.exports = __toCommonJS(stdin_exports);
+var import_mysql_core = require("drizzle-orm/mysql-core");
+var import_drizzle_orm = require("drizzle-orm");
+var import_targets = require("./targets");
+var import_users = require("./users");
+const target_sales = (0, import_mysql_core.mysqlTable)("target_sales", {
+  id: (0, import_mysql_core.char)("id", { length: 36 }).primaryKey().default(import_drizzle_orm.sql`(UUID())`),
+  target_id: (0, import_mysql_core.char)("target_id", { length: 36 }).references(() => import_targets.targets.id, { onDelete: "cascade" }),
+  user_id: (0, import_mysql_core.char)("user_id", { length: 36 }).references(() => import_users.users.id, { onDelete: "cascade" }),
+  createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
+  updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow().onUpdateNow()
+});
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  target_sales
 });

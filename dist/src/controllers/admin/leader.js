@@ -1,290 +1,265 @@
-"use strict";
-// src/controllers/Leader/LeaderController.ts
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
 };
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteLeader = exports.updateLeader = exports.createLeader = exports.getLeaderById = exports.lists = exports.getAllLeader = exports.leaderIdSchema = exports.updateLeaderSchema = exports.createLeaderSchema = void 0;
-const db_1 = require("../../models/db");
-const schema_1 = require("../../models/schema");
-const drizzle_orm_1 = require("drizzle-orm");
-const response_1 = require("../../utils/response");
-const NotFound_1 = require("../../Errors/NotFound");
-const BadRequest_1 = require("../../Errors/BadRequest");
-const bcrypt_1 = __importDefault(require("bcrypt"));
-const handleImages_1 = require("../../utils/handleImages");
-const deleteImage_1 = require("../../utils/deleteImage");
-const zod_1 = require("zod");
-// ==========================================
-// 🛡️ Zod Validation Schemas
-// ==========================================
-// الـ Schema الخاص بإنشاء مستخدم Leader جديد
-exports.createLeaderSchema = zod_1.z.object({
-    body: zod_1.z.object({
-        name: zod_1.z.string({ required_error: "Name is required" })
-            .min(1, "Name cannot be empty")
-            .max(200, "Name cannot exceed 200 characters"),
-        email: zod_1.z.string({ required_error: "Email is required" })
-            .email("Invalid email format")
-            .max(100, "Email cannot exceed 100 characters"),
-        phone: zod_1.z.string({ required_error: "Phone is required" })
-            .min(5, "Phone is too short")
-            .max(20, "Phone cannot exceed 20 characters"),
-        password: zod_1.z.string({ required_error: "Password is required" })
-            .min(6, "Password must be at least 6 characters"),
-        image: zod_1.z.string().nullable().optional(),
-        target_id: zod_1.z.string().uuid("Invalid target ID format").nullable().optional(),
-        status: zod_1.z.enum(["active", "inactive"], {
-            required_error: "Status is required",
-            invalid_type_error: "Status must be either 'active' or 'inactive'",
-        }),
-    }),
+var __copyProps = (to, from, except, desc2) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc2 = __getOwnPropDesc(from, key)) || desc2.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var stdin_exports = {};
+__export(stdin_exports, {
+  createLeader: () => createLeader,
+  createLeaderSchema: () => createLeaderSchema,
+  deleteLeader: () => deleteLeader,
+  getAllLeader: () => getAllLeader,
+  getAllLeaderSchema: () => getAllLeaderSchema,
+  getLeaderById: () => getLeaderById,
+  leaderIdSchema: () => leaderIdSchema,
+  lists: () => lists,
+  updateLeader: () => updateLeader,
+  updateLeaderSchema: () => updateLeaderSchema
 });
-// الـ Schema الخاص بتحديث مستخدم Leader
-exports.updateLeaderSchema = zod_1.z.object({
-    params: zod_1.z.object({
-        id: zod_1.z.string({ required_error: "ID is required" }).uuid("Invalid leader ID format"),
-    }),
-    body: zod_1.z.object({
-        name: zod_1.z.string().min(1, "Name cannot be empty").max(200).optional(),
-        email: zod_1.z.string().email("Invalid email format").max(100).optional(),
-        phone: zod_1.z.string().min(5).max(20).optional(),
-        password: zod_1.z.string().min(6, "Password must be at least 6 characters").optional(),
-        image: zod_1.z.string().nullable().optional(),
-        target_id: zod_1.z.string().uuid("Invalid target ID format").nullable().optional(),
-        status: zod_1.z.enum(["active", "inactive"]).optional(),
-    }),
+module.exports = __toCommonJS(stdin_exports);
+var import_db = require("../../models/db");
+var import_schema = require("../../models/schema");
+var import_drizzle_orm = require("drizzle-orm");
+var import_response = require("../../utils/response");
+var import_NotFound = require("../../Errors/NotFound");
+var import_BadRequest = require("../../Errors/BadRequest");
+var import_bcrypt = __toESM(require("bcrypt"));
+var import_handleImages = require("../../utils/handleImages");
+var import_deleteImage = require("../../utils/deleteImage");
+var import_zod = require("zod");
+const createLeaderSchema = import_zod.z.object({
+  body: import_zod.z.object({
+    name: import_zod.z.string({ required_error: "Name is required" }).min(1, "Name cannot be empty").max(200, "Name cannot exceed 200 characters"),
+    email: import_zod.z.string({ required_error: "Email is required" }).email("Invalid email format").max(100, "Email cannot exceed 100 characters"),
+    phone: import_zod.z.string({ required_error: "Phone is required" }).min(5, "Phone is too short").max(20, "Phone cannot exceed 20 characters"),
+    password: import_zod.z.string({ required_error: "Password is required" }).min(6, "Password must be at least 6 characters"),
+    image: import_zod.z.string().nullable().optional(),
+    target_id: import_zod.z.string().uuid("Invalid target ID format").nullable().optional(),
+    status: import_zod.z.enum(["active", "inactive"], {
+      required_error: "Status is required",
+      invalid_type_error: "Status must be either 'active' or 'inactive'"
+    })
+  })
 });
-// الـ Schema للعمليات التي تتطلب المعرف ID فقط في الـ parameters
-exports.leaderIdSchema = zod_1.z.object({
-    params: zod_1.z.object({
-        id: zod_1.z.string({ required_error: "ID is required" }).uuid("Invalid leader ID format"),
-    }),
+const updateLeaderSchema = import_zod.z.object({
+  params: import_zod.z.object({
+    id: import_zod.z.string({ required_error: "ID is required" }).uuid("Invalid leader ID format")
+  }),
+  body: import_zod.z.object({
+    name: import_zod.z.string().min(1, "Name cannot be empty").max(200).optional(),
+    email: import_zod.z.string().email("Invalid email format").max(100).optional(),
+    phone: import_zod.z.string().min(5).max(20).optional(),
+    password: import_zod.z.string().min(6, "Password must be at least 6 characters").optional(),
+    image: import_zod.z.string().nullable().optional(),
+    target_id: import_zod.z.string().uuid("Invalid target ID format").nullable().optional(),
+    status: import_zod.z.enum(["active", "inactive"]).optional()
+  })
 });
-// ==========================================
-// 🎮 Controllers
-// ==========================================
-// ✅ Get All Leaders
+const leaderIdSchema = import_zod.z.object({
+  params: import_zod.z.object({
+    id: import_zod.z.string({ required_error: "ID is required" }).uuid("Invalid leader ID format")
+  })
+});
+const getAllLeaderSchema = import_zod.z.object({
+  query: import_zod.z.object({
+    page: import_zod.z.coerce.number().int().positive().optional(),
+    limit: import_zod.z.coerce.number().int().positive().optional(),
+    search: import_zod.z.string().optional()
+  })
+});
 const getAllLeader = async (req, res) => {
-    // استقبال معايير الـ Pagination والبحث
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const search = req.query.search || '';
-    const offset = (page - 1) * limit;
-    let whereConditions = [];
-    // 1. الفلترة الأساسية: جلب المستخدمين الذين يمتلكون دور "leader" فقط
-    whereConditions.push((0, drizzle_orm_1.eq)(schema_1.users.role, "leader"));
-    // 2. تطبيق البحث (Search) بالاسم، الهاتف، أو البريد الإلكتروني للقادة
-    if (search) {
-        const searchPattern = `%${search}%`;
-        whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.like)(schema_1.users.name, searchPattern), (0, drizzle_orm_1.like)(schema_1.users.phone, searchPattern), (0, drizzle_orm_1.like)(schema_1.users.email, searchPattern)));
+  await getAllLeaderSchema.parseAsync({ query: req.query });
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const search = req.query.search || "";
+  const offset = (page - 1) * limit;
+  let whereConditions = [];
+  whereConditions.push((0, import_drizzle_orm.eq)(import_schema.users.role, "leader"));
+  if (search) {
+    const searchPattern = `%${search}%`;
+    whereConditions.push(
+      (0, import_drizzle_orm.or)(
+        (0, import_drizzle_orm.like)(import_schema.users.name, searchPattern),
+        (0, import_drizzle_orm.like)(import_schema.users.phone, searchPattern),
+        (0, import_drizzle_orm.like)(import_schema.users.email, searchPattern)
+      )
+    );
+  }
+  let query = import_db.db.select({
+    id: import_schema.users.id,
+    name: import_schema.users.name,
+    email: import_schema.users.email,
+    phone: import_schema.users.phone,
+    image: import_schema.users.image,
+    target: import_schema.targets.name,
+    status: import_schema.users.status,
+    createdAt: import_schema.users.createdAt
+  }).from(import_schema.users).leftJoin(import_schema.targets, (0, import_drizzle_orm.eq)(import_schema.users.target_id, import_schema.targets.id)).orderBy((0, import_drizzle_orm.desc)(import_schema.users.createdAt)).$dynamic();
+  let countQuery = import_db.db.select({ total: (0, import_drizzle_orm.count)() }).from(import_schema.users).$dynamic();
+  if (whereConditions.length > 0) {
+    query = query.where((0, import_drizzle_orm.and)(...whereConditions));
+    countQuery = countQuery.where((0, import_drizzle_orm.and)(...whereConditions));
+  }
+  const [allLeaders, [{ total: totalCount }]] = await Promise.all([
+    query.limit(limit).offset(offset),
+    countQuery
+  ]);
+  (0, import_response.SuccessResponse)(res, {
+    leaders: allLeaders,
+    pagination: {
+      total: totalCount,
+      page,
+      limit,
+      totalPages: Math.ceil(totalCount / limit)
     }
-    // 3. بناء استعلام البيانات الأساسي (Base Query)
-    let query = db_1.db
-        .select({
-        id: schema_1.users.id,
-        name: schema_1.users.name,
-        email: schema_1.users.email,
-        phone: schema_1.users.phone,
-        image: schema_1.users.image,
-        target: schema_1.targets.name,
-        status: schema_1.users.status,
-        createdAt: schema_1.users.createdAt
-    })
-        .from(schema_1.users)
-        .leftJoin(schema_1.targets, (0, drizzle_orm_1.eq)(schema_1.users.target_id, schema_1.targets.id))
-        .orderBy((0, drizzle_orm_1.desc)(schema_1.users.createdAt)) // ترتيب الأحدث أولاً
-        .$dynamic();
-    // 4. بناء استعلام الـ Count لحساب العدد الإجمالي متوافقاً مع فلاتر البحث
-    let countQuery = db_1.db
-        .select({ total: (0, drizzle_orm_1.count)() })
-        .from(schema_1.users)
-        .$dynamic();
-    // ربط الشروط بالاستعلامات
-    if (whereConditions.length > 0) {
-        query = query.where((0, drizzle_orm_1.and)(...whereConditions));
-        countQuery = countQuery.where((0, drizzle_orm_1.and)(...whereConditions));
-    }
-    // 5. تنفيذ الاستعلامين بالتوازي (Parallel Execution) لتقليل زمن الاستجابة
-    const [allLeaders, [{ total: totalCount }]] = await Promise.all([
-        query.limit(limit).offset(offset),
-        countQuery
-    ]);
-    // 6. إرسال النتيجة مع معلومات الـ Pagination الكاملة
-    (0, response_1.SuccessResponse)(res, {
-        leaders: allLeaders,
-        pagination: {
-            total: totalCount,
-            page,
-            limit,
-            totalPages: Math.ceil(totalCount / limit)
-        }
-    }, 200);
+  }, 200);
 };
-exports.getAllLeader = getAllLeader;
-// ✅ Get Targets List (لإستخدامها في القائمة المنسدلة)
 const lists = async (req, res) => {
-    const target_list = await db_1.db
-        .select({
-        id: schema_1.targets.id,
-        name: schema_1.targets.name,
-    })
-        .from(schema_1.targets);
-    (0, response_1.SuccessResponse)(res, { target_list }, 200);
+  const target_list = await import_db.db.select({
+    id: import_schema.targets.id,
+    name: import_schema.targets.name
+  }).from(import_schema.targets);
+  (0, import_response.SuccessResponse)(res, { target_list }, 200);
 };
-exports.lists = lists;
-// ✅ Get Leader By ID
 const getLeaderById = async (req, res) => {
-    const validated = await exports.leaderIdSchema.parseAsync({ params: req.params });
-    const { id } = validated.params;
-    const leader = await db_1.db
-        .select({
-        id: schema_1.users.id,
-        name: schema_1.users.name,
-        email: schema_1.users.email,
-        phone: schema_1.users.phone,
-        image: schema_1.users.image,
-        target_id: schema_1.users.target_id,
-        status: schema_1.users.status,
-    })
-        .from(schema_1.users)
-        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.id, id), (0, drizzle_orm_1.eq)(schema_1.users.role, "leader")))
-        .limit(1);
-    if (!leader[0]) {
-        throw new NotFound_1.NotFound("Leader not found");
-    }
-    (0, response_1.SuccessResponse)(res, { leader: leader[0] }, 200);
+  const validated = await leaderIdSchema.parseAsync({ params: req.params });
+  const { id } = validated.params;
+  const leader = await import_db.db.select({
+    id: import_schema.users.id,
+    name: import_schema.users.name,
+    email: import_schema.users.email,
+    phone: import_schema.users.phone,
+    image: import_schema.users.image,
+    target_id: import_schema.users.target_id,
+    status: import_schema.users.status
+  }).from(import_schema.users).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(import_schema.users.id, id), (0, import_drizzle_orm.eq)(import_schema.users.role, "leader"))).limit(1);
+  if (!leader[0]) {
+    throw new import_NotFound.NotFound("Leader not found");
+  }
+  (0, import_response.SuccessResponse)(res, { leader: leader[0] }, 200);
 };
-exports.getLeaderById = getLeaderById;
-// ✅ Create Leader
 const createLeader = async (req, res) => {
-    const validated = await exports.createLeaderSchema.parseAsync({ body: req.body });
-    const { name, email, password, phone, image, target_id, status } = validated.body;
-    // تحقق من عدم وجود مستخدم آخر بنفس الـ email أو الـ phone
-    const existingLeader = await db_1.db
-        .select()
-        .from(schema_1.users)
-        .where((0, drizzle_orm_1.or)((0, drizzle_orm_1.eq)(schema_1.users.email, email), (0, drizzle_orm_1.eq)(schema_1.users.phone, phone)))
-        .limit(1);
-    if (existingLeader[0]) {
-        throw new BadRequest_1.BadRequest("Email or Phone already exists");
-    }
-    // تشفير كلمة المرور
-    const hashedPassword = await bcrypt_1.default.hash(password, 10);
-    let savedLeaderImage = null;
-    if (image) {
-        const result = await (0, handleImages_1.saveBase64Image)(req, image, "leaders");
-        savedLeaderImage = result.url;
-    }
-    await db_1.db.insert(schema_1.users).values({
-        name,
-        email,
-        phone,
-        image: savedLeaderImage,
-        password: hashedPassword,
-        role: "leader",
-        target_id: target_id || null, // ربط القائد بالـ target إن وجد
-        status: status,
-    });
-    (0, response_1.SuccessResponse)(res, { message: "Leader created successfully" }, 201);
+  const validated = await createLeaderSchema.parseAsync({ body: req.body });
+  const { name, email, password, phone, image, target_id, status } = validated.body;
+  const existingLeader = await import_db.db.select().from(import_schema.users).where((0, import_drizzle_orm.or)((0, import_drizzle_orm.eq)(import_schema.users.email, email), (0, import_drizzle_orm.eq)(import_schema.users.phone, phone))).limit(1);
+  if (existingLeader[0]) {
+    throw new import_BadRequest.BadRequest("Email or Phone already exists");
+  }
+  const hashedPassword = await import_bcrypt.default.hash(password, 10);
+  let savedLeaderImage = null;
+  if (image) {
+    const result = await (0, import_handleImages.saveBase64Image)(req, image, "leaders");
+    savedLeaderImage = result.url;
+  }
+  await import_db.db.insert(import_schema.users).values({
+    name,
+    email,
+    phone,
+    image: savedLeaderImage,
+    password: hashedPassword,
+    role: "leader",
+    target_id: target_id || null,
+    // ربط القائد بالـ target إن وجد
+    status
+  });
+  (0, import_response.SuccessResponse)(res, { message: "Leader created successfully" }, 201);
 };
-exports.createLeader = createLeader;
-// ✅ Update Leader
 const updateLeader = async (req, res) => {
-    const validated = await exports.updateLeaderSchema.parseAsync({
-        params: req.params,
-        body: req.body
-    });
-    const { id } = validated.params;
-    const { name, email, password, phone, image, target_id, status } = validated.body;
-    // تحقق من وجود الـ Leader
-    const existingLeader = await db_1.db
-        .select()
-        .from(schema_1.users)
-        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.id, id), (0, drizzle_orm_1.eq)(schema_1.users.role, "leader")))
-        .limit(1);
-    if (!existingLeader[0]) {
-        throw new NotFound_1.NotFound("Leader not found");
+  const validated = await updateLeaderSchema.parseAsync({
+    params: req.params,
+    body: req.body
+  });
+  const { id } = validated.params;
+  const { name, email, password, phone, image, target_id, status } = validated.body;
+  const existingLeader = await import_db.db.select().from(import_schema.users).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(import_schema.users.id, id), (0, import_drizzle_orm.eq)(import_schema.users.role, "leader"))).limit(1);
+  if (!existingLeader[0]) {
+    throw new import_NotFound.NotFound("Leader not found");
+  }
+  if (email && email !== existingLeader[0].email) {
+    const duplicateEmail = await import_db.db.select().from(import_schema.users).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(import_schema.users.email, email), (0, import_drizzle_orm.ne)(import_schema.users.id, id))).limit(1);
+    if (duplicateEmail[0]) {
+      throw new import_BadRequest.BadRequest("Email already exists");
     }
-    // تحقق من الـ email لو تم تعديله ولم يكرر مع حساب آخر
-    if (email && email !== existingLeader[0].email) {
-        const duplicateEmail = await db_1.db
-            .select()
-            .from(schema_1.users)
-            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.email, email), (0, drizzle_orm_1.ne)(schema_1.users.id, id)))
-            .limit(1);
-        if (duplicateEmail[0]) {
-            throw new BadRequest_1.BadRequest("Email already exists");
-        }
+  }
+  if (phone && phone !== existingLeader[0].phone) {
+    const duplicatePhone = await import_db.db.select().from(import_schema.users).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(import_schema.users.phone, phone), (0, import_drizzle_orm.ne)(import_schema.users.id, id))).limit(1);
+    if (duplicatePhone[0]) {
+      throw new import_BadRequest.BadRequest("Phone already exists");
     }
-    // تحقق من الـ phone لو تم تعديله ولم يكرر مع حساب آخر
-    if (phone && phone !== existingLeader[0].phone) {
-        const duplicatePhone = await db_1.db
-            .select()
-            .from(schema_1.users)
-            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.phone, phone), (0, drizzle_orm_1.ne)(schema_1.users.id, id)))
-            .limit(1);
-        if (duplicatePhone[0]) {
-            throw new BadRequest_1.BadRequest("Phone already exists");
-        }
+  }
+  let leaderImage = existingLeader[0].image;
+  if (image !== void 0) {
+    if (image) {
+      const result = await (0, import_handleImages.saveBase64Image)(req, image, "leaders");
+      if (existingLeader[0].image) {
+        await (0, import_deleteImage.deletePhotoFromServer)(existingLeader[0].image);
+      }
+      leaderImage = result.url;
+    } else {
+      if (existingLeader[0].image) {
+        await (0, import_deleteImage.deletePhotoFromServer)(existingLeader[0].image);
+      }
+      leaderImage = null;
     }
-    let leaderImage = existingLeader[0].image;
-    if (image !== undefined) {
-        if (image) {
-            const result = await (0, handleImages_1.saveBase64Image)(req, image, "leaders");
-            // حذف الصورة القديمة من السيرفر بعد رفع الصورة الجديدة بنجاح
-            if (existingLeader[0].image) {
-                await (0, deleteImage_1.deletePhotoFromServer)(existingLeader[0].image);
-            }
-            leaderImage = result.url;
-        }
-        else {
-            // تصفير الصورة وحذفها من السيرفر إذا أرسل قيمة فارغة
-            if (existingLeader[0].image) {
-                await (0, deleteImage_1.deletePhotoFromServer)(existingLeader[0].image);
-            }
-            leaderImage = null;
-        }
-    }
-    // بناء كائن البيانات المحدثة مع تلافي القيم الـ undefined
-    const updateData = {};
-    if (name !== undefined)
-        updateData.name = name;
-    if (email !== undefined)
-        updateData.email = email;
-    if (phone !== undefined)
-        updateData.phone = phone;
-    if (leaderImage !== undefined)
-        updateData.image = leaderImage;
-    if (status !== undefined)
-        updateData.status = status;
-    if (target_id !== undefined)
-        updateData.target_id = target_id;
-    // لو تم إرسال password جديد
-    if (password) {
-        updateData.password = await bcrypt_1.default.hash(password, 10);
-    }
-    await db_1.db.update(schema_1.users).set(updateData).where((0, drizzle_orm_1.eq)(schema_1.users.id, id));
-    (0, response_1.SuccessResponse)(res, { message: "Leader updated successfully" }, 200);
+  }
+  const updateData = {};
+  if (name !== void 0) updateData.name = name;
+  if (email !== void 0) updateData.email = email;
+  if (phone !== void 0) updateData.phone = phone;
+  if (leaderImage !== void 0) updateData.image = leaderImage;
+  if (status !== void 0) updateData.status = status;
+  if (target_id !== void 0) updateData.target_id = target_id;
+  if (password) {
+    updateData.password = await import_bcrypt.default.hash(password, 10);
+  }
+  await import_db.db.update(import_schema.users).set(updateData).where((0, import_drizzle_orm.eq)(import_schema.users.id, id));
+  (0, import_response.SuccessResponse)(res, { message: "Leader updated successfully" }, 200);
 };
-exports.updateLeader = updateLeader;
-// ✅ Delete Leader
 const deleteLeader = async (req, res) => {
-    const validated = await exports.leaderIdSchema.parseAsync({ params: req.params });
-    const { id } = validated.params;
-    const existingLeader = await db_1.db
-        .select()
-        .from(schema_1.users)
-        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.id, id), (0, drizzle_orm_1.eq)(schema_1.users.role, "leader")))
-        .limit(1);
-    if (!existingLeader[0]) {
-        throw new NotFound_1.NotFound("Leader not found");
-    }
-    // حذف صورة الـ Leader من السيرفر أولاً
-    if (existingLeader[0].image) {
-        await (0, deleteImage_1.deletePhotoFromServer)(existingLeader[0].image);
-    }
-    await db_1.db.delete(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.id, id));
-    (0, response_1.SuccessResponse)(res, { message: "Leader deleted successfully" }, 200);
+  const validated = await leaderIdSchema.parseAsync({ params: req.params });
+  const { id } = validated.params;
+  const existingLeader = await import_db.db.select().from(import_schema.users).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(import_schema.users.id, id), (0, import_drizzle_orm.eq)(import_schema.users.role, "leader"))).limit(1);
+  if (!existingLeader[0]) {
+    throw new import_NotFound.NotFound("Leader not found");
+  }
+  if (existingLeader[0].image) {
+    await (0, import_deleteImage.deletePhotoFromServer)(existingLeader[0].image);
+  }
+  await import_db.db.delete(import_schema.users).where((0, import_drizzle_orm.eq)(import_schema.users.id, id));
+  (0, import_response.SuccessResponse)(res, { message: "Leader deleted successfully" }, 200);
 };
-exports.deleteLeader = deleteLeader;
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  createLeader,
+  createLeaderSchema,
+  deleteLeader,
+  getAllLeader,
+  getAllLeaderSchema,
+  getLeaderById,
+  leaderIdSchema,
+  lists,
+  updateLeader,
+  updateLeaderSchema
+});

@@ -1,56 +1,76 @@
-"use strict";
-// src/seeds/05_default_wishlist.ts
-Object.defineProperty(exports, "__esModule", { value: true });
-const db_1 = require("../../models/db");
-const schema_1 = require("../../models/schema");
-const drizzle_orm_1 = require("drizzle-orm");
-const seed = {
-    name: "05_default_wishlist",
-    async run() {
-        console.log("   📝 Inserting rich set of default wishlist items...");
-        const wishListData = [
-            {
-                name: "إتاحة نظام الدفع والتقسيط على 12 شهر",
-                description: "العميل يطلب توفير خيار التقسيط بدون فوائد بالتعاون مع بنوك مصرية كشرط أساسي لزيادة حجم الطلبيات في الربع القادم.",
-            },
-            {
-                name: "لوحة تحكم (Dashboard) مخصصة لقادة الفرق",
-                description: "توفير واجهة رسومية فورية لمتابعة أداء المناديب في الشارع لحظة بلحظة ومقارنة الإنجاز مع التارجت الفعلي.",
-            },
-            {
-                name: "دعم فني متاح 24/7 طوال الأسبوع",
-                description: "رغبة ملحة من كبار عملاء الصيدليات والمستشفيات للحصول على خط دعم ساخن لحالات الطوارئ خارج أوقات العمل الرسمية.",
-            },
-            {
-                name: "توفير تطبيق جوال يعمل بالكامل بدون إنترنت (Offline Mode)",
-                description: "تطبيق للمناديب يتيح تسجيل الزيارات وحفظ الموقع الجغرافي دون الحاجة لاتصال إنترنت مستمر، مع مزامنة البيانات تلقائياً فور توفر الشبكة.",
-            },
-            {
-                name: "تكامل مع نظام الفواتير الإلكترونية (Zakat & Tax Integration)",
-                description: "الشركات الكبرى تبدي رغبة في ربط برنامج الـ CRM والمبيعات بنظام مصلحة الضرائب لإنشاء الفواتير القانونية بضغطة زر.",
-            },
-            {
-                name: "توفير كتالوج منتجات تفاعلي مع نماذج 3D",
-                description: "رغبة من عملاء شركات الأثاث والتطوير العقاري لعرض المنتجات للزبائن بشكل تفاعلي ومبهر أثناء الزيارة الميدانية.",
-            },
-            {
-                name: "تنبيهات وإشعارات عبر الواتساب تلقائياً (WhatsApp Automation)",
-                description: "إرسال رسالة ترحيبية أو تفاصيل الفاتورة ومواعيد الزيارات للعميل بشكل تلقائي عبر الواتساب بمجرد تغيير حالة الزيارة إلى (Sales).",
-            },
-            {
-                name: "توفير خصومات موسمية للعملاء الأوفياء",
-                description: "صياغة نظام ولاء مدمج يمنح كود خصم تلقائي للعملاء الذين تخطى حجم تعاملهم التاريخي حاجز الـ 100 ألف جنيه.",
-            }
-        ];
-        console.log("   📥 Saving wishlist items...");
-        await db_1.db.insert(schema_1.wishList).values(wishListData);
-        console.log(`   🚀 Completed! Seeded ${wishListData.length} highly requested wishlist items.`);
-    },
-    async rollback() {
-        console.log("   🗑️ Rolling back seeded wishlist items...");
-        // حذف الرغبات المحددة لضمان عدم تأثر أي بيانات تم إدخالها لاحقاً بواسطة المستخدمين
-        await db_1.db.delete(schema_1.wishList).where((0, drizzle_orm_1.sql) `id LIKE 'w1111111%' OR id LIKE 'w2222222%' OR id LIKE 'w3333333%' OR id LIKE 'w4444444%' OR id LIKE 'w5555555%' OR id LIKE 'w6666666%' OR id LIKE 'w7777777%' OR id LIKE 'w8888888%'`);
-        console.log("   ✅ Rollback completed successfully.");
-    },
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
 };
-exports.default = seed;
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var stdin_exports = {};
+__export(stdin_exports, {
+  default: () => stdin_default
+});
+module.exports = __toCommonJS(stdin_exports);
+var import_db = require("../../models/db");
+var import_schema = require("../../models/schema");
+var import_drizzle_orm = require("drizzle-orm");
+const seed = {
+  name: "05_default_wishlist",
+  async run() {
+    console.log("   \u{1F4DD} Inserting rich set of default wishlist items...");
+    const wishListData = [
+      {
+        name: "\u0625\u062A\u0627\u062D\u0629 \u0646\u0638\u0627\u0645 \u0627\u0644\u062F\u0641\u0639 \u0648\u0627\u0644\u062A\u0642\u0633\u064A\u0637 \u0639\u0644\u0649 12 \u0634\u0647\u0631",
+        description: "\u0627\u0644\u0639\u0645\u064A\u0644 \u064A\u0637\u0644\u0628 \u062A\u0648\u0641\u064A\u0631 \u062E\u064A\u0627\u0631 \u0627\u0644\u062A\u0642\u0633\u064A\u0637 \u0628\u062F\u0648\u0646 \u0641\u0648\u0627\u0626\u062F \u0628\u0627\u0644\u062A\u0639\u0627\u0648\u0646 \u0645\u0639 \u0628\u0646\u0648\u0643 \u0645\u0635\u0631\u064A\u0629 \u0643\u0634\u0631\u0637 \u0623\u0633\u0627\u0633\u064A \u0644\u0632\u064A\u0627\u062F\u0629 \u062D\u062C\u0645 \u0627\u0644\u0637\u0644\u0628\u064A\u0627\u062A \u0641\u064A \u0627\u0644\u0631\u0628\u0639 \u0627\u0644\u0642\u0627\u062F\u0645."
+      },
+      {
+        name: "\u0644\u0648\u062D\u0629 \u062A\u062D\u0643\u0645 (Dashboard) \u0645\u062E\u0635\u0635\u0629 \u0644\u0642\u0627\u062F\u0629 \u0627\u0644\u0641\u0631\u0642",
+        description: "\u062A\u0648\u0641\u064A\u0631 \u0648\u0627\u062C\u0647\u0629 \u0631\u0633\u0648\u0645\u064A\u0629 \u0641\u0648\u0631\u064A\u0629 \u0644\u0645\u062A\u0627\u0628\u0639\u0629 \u0623\u062F\u0627\u0621 \u0627\u0644\u0645\u0646\u0627\u062F\u064A\u0628 \u0641\u064A \u0627\u0644\u0634\u0627\u0631\u0639 \u0644\u062D\u0638\u0629 \u0628\u0644\u062D\u0638\u0629 \u0648\u0645\u0642\u0627\u0631\u0646\u0629 \u0627\u0644\u0625\u0646\u062C\u0627\u0632 \u0645\u0639 \u0627\u0644\u062A\u0627\u0631\u062C\u062A \u0627\u0644\u0641\u0639\u0644\u064A."
+      },
+      {
+        name: "\u062F\u0639\u0645 \u0641\u0646\u064A \u0645\u062A\u0627\u062D 24/7 \u0637\u0648\u0627\u0644 \u0627\u0644\u0623\u0633\u0628\u0648\u0639",
+        description: "\u0631\u063A\u0628\u0629 \u0645\u0644\u062D\u0629 \u0645\u0646 \u0643\u0628\u0627\u0631 \u0639\u0645\u0644\u0627\u0621 \u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0627\u062A \u0648\u0627\u0644\u0645\u0633\u062A\u0634\u0641\u064A\u0627\u062A \u0644\u0644\u062D\u0635\u0648\u0644 \u0639\u0644\u0649 \u062E\u0637 \u062F\u0639\u0645 \u0633\u0627\u062E\u0646 \u0644\u062D\u0627\u0644\u0627\u062A \u0627\u0644\u0637\u0648\u0627\u0631\u0626 \u062E\u0627\u0631\u062C \u0623\u0648\u0642\u0627\u062A \u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u0631\u0633\u0645\u064A\u0629."
+      },
+      {
+        name: "\u062A\u0648\u0641\u064A\u0631 \u062A\u0637\u0628\u064A\u0642 \u062C\u0648\u0627\u0644 \u064A\u0639\u0645\u0644 \u0628\u0627\u0644\u0643\u0627\u0645\u0644 \u0628\u062F\u0648\u0646 \u0625\u0646\u062A\u0631\u0646\u062A (Offline Mode)",
+        description: "\u062A\u0637\u0628\u064A\u0642 \u0644\u0644\u0645\u0646\u0627\u062F\u064A\u0628 \u064A\u062A\u064A\u062D \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0632\u064A\u0627\u0631\u0627\u062A \u0648\u062D\u0641\u0638 \u0627\u0644\u0645\u0648\u0642\u0639 \u0627\u0644\u062C\u063A\u0631\u0627\u0641\u064A \u062F\u0648\u0646 \u0627\u0644\u062D\u0627\u062C\u0629 \u0644\u0627\u062A\u0635\u0627\u0644 \u0625\u0646\u062A\u0631\u0646\u062A \u0645\u0633\u062A\u0645\u0631\u060C \u0645\u0639 \u0645\u0632\u0627\u0645\u0646\u0629 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u062A\u0644\u0642\u0627\u0626\u064A\u0627\u064B \u0641\u0648\u0631 \u062A\u0648\u0641\u0631 \u0627\u0644\u0634\u0628\u0643\u0629."
+      },
+      {
+        name: "\u062A\u0643\u0627\u0645\u0644 \u0645\u0639 \u0646\u0638\u0627\u0645 \u0627\u0644\u0641\u0648\u0627\u062A\u064A\u0631 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0629 (Zakat & Tax Integration)",
+        description: "\u0627\u0644\u0634\u0631\u0643\u0627\u062A \u0627\u0644\u0643\u0628\u0631\u0649 \u062A\u0628\u062F\u064A \u0631\u063A\u0628\u0629 \u0641\u064A \u0631\u0628\u0637 \u0628\u0631\u0646\u0627\u0645\u062C \u0627\u0644\u0640 CRM \u0648\u0627\u0644\u0645\u0628\u064A\u0639\u0627\u062A \u0628\u0646\u0638\u0627\u0645 \u0645\u0635\u0644\u062D\u0629 \u0627\u0644\u0636\u0631\u0627\u0626\u0628 \u0644\u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0641\u0648\u0627\u062A\u064A\u0631 \u0627\u0644\u0642\u0627\u0646\u0648\u0646\u064A\u0629 \u0628\u0636\u063A\u0637\u0629 \u0632\u0631."
+      },
+      {
+        name: "\u062A\u0648\u0641\u064A\u0631 \u0643\u062A\u0627\u0644\u0648\u062C \u0645\u0646\u062A\u062C\u0627\u062A \u062A\u0641\u0627\u0639\u0644\u064A \u0645\u0639 \u0646\u0645\u0627\u0630\u062C 3D",
+        description: "\u0631\u063A\u0628\u0629 \u0645\u0646 \u0639\u0645\u0644\u0627\u0621 \u0634\u0631\u0643\u0627\u062A \u0627\u0644\u0623\u062B\u0627\u062B \u0648\u0627\u0644\u062A\u0637\u0648\u064A\u0631 \u0627\u0644\u0639\u0642\u0627\u0631\u064A \u0644\u0639\u0631\u0636 \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0644\u0644\u0632\u0628\u0627\u0626\u0646 \u0628\u0634\u0643\u0644 \u062A\u0641\u0627\u0639\u0644\u064A \u0648\u0645\u0628\u0647\u0631 \u0623\u062B\u0646\u0627\u0621 \u0627\u0644\u0632\u064A\u0627\u0631\u0629 \u0627\u0644\u0645\u064A\u062F\u0627\u0646\u064A\u0629."
+      },
+      {
+        name: "\u062A\u0646\u0628\u064A\u0647\u0627\u062A \u0648\u0625\u0634\u0639\u0627\u0631\u0627\u062A \u0639\u0628\u0631 \u0627\u0644\u0648\u0627\u062A\u0633\u0627\u0628 \u062A\u0644\u0642\u0627\u0626\u064A\u0627\u064B (WhatsApp Automation)",
+        description: "\u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629 \u062A\u0631\u062D\u064A\u0628\u064A\u0629 \u0623\u0648 \u062A\u0641\u0627\u0635\u064A\u0644 \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u0648\u0645\u0648\u0627\u0639\u064A\u062F \u0627\u0644\u0632\u064A\u0627\u0631\u0627\u062A \u0644\u0644\u0639\u0645\u064A\u0644 \u0628\u0634\u0643\u0644 \u062A\u0644\u0642\u0627\u0626\u064A \u0639\u0628\u0631 \u0627\u0644\u0648\u0627\u062A\u0633\u0627\u0628 \u0628\u0645\u062C\u0631\u062F \u062A\u063A\u064A\u064A\u0631 \u062D\u0627\u0644\u0629 \u0627\u0644\u0632\u064A\u0627\u0631\u0629 \u0625\u0644\u0649 (Sales)."
+      },
+      {
+        name: "\u062A\u0648\u0641\u064A\u0631 \u062E\u0635\u0648\u0645\u0627\u062A \u0645\u0648\u0633\u0645\u064A\u0629 \u0644\u0644\u0639\u0645\u0644\u0627\u0621 \u0627\u0644\u0623\u0648\u0641\u064A\u0627\u0621",
+        description: "\u0635\u064A\u0627\u063A\u0629 \u0646\u0638\u0627\u0645 \u0648\u0644\u0627\u0621 \u0645\u062F\u0645\u062C \u064A\u0645\u0646\u062D \u0643\u0648\u062F \u062E\u0635\u0645 \u062A\u0644\u0642\u0627\u0626\u064A \u0644\u0644\u0639\u0645\u0644\u0627\u0621 \u0627\u0644\u0630\u064A\u0646 \u062A\u062E\u0637\u0649 \u062D\u062C\u0645 \u062A\u0639\u0627\u0645\u0644\u0647\u0645 \u0627\u0644\u062A\u0627\u0631\u064A\u062E\u064A \u062D\u0627\u062C\u0632 \u0627\u0644\u0640 100 \u0623\u0644\u0641 \u062C\u0646\u064A\u0647."
+      }
+    ];
+    console.log("   \u{1F4E5} Saving wishlist items...");
+    await import_db.db.insert(import_schema.wishList).values(wishListData);
+    console.log(`   \u{1F680} Completed! Seeded ${wishListData.length} highly requested wishlist items.`);
+  },
+  async rollback() {
+    console.log("   \u{1F5D1}\uFE0F Rolling back seeded wishlist items...");
+    await import_db.db.delete(import_schema.wishList).where(
+      import_drizzle_orm.sql`id LIKE 'w1111111%' OR id LIKE 'w2222222%' OR id LIKE 'w3333333%' OR id LIKE 'w4444444%' OR id LIKE 'w5555555%' OR id LIKE 'w6666666%' OR id LIKE 'w7777777%' OR id LIKE 'w8888888%'`
+    );
+    console.log("   \u2705 Rollback completed successfully.");
+  }
+};
+var stdin_default = seed;

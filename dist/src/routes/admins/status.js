@@ -1,204 +1,33 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = require("express");
-const status_1 = require("../../controllers/admin/status");
-const catchAsync_1 = require("../../utils/catchAsync");
-const checkpermission_1 = require("../../middlewares/checkpermission");
-const router = (0, express_1.Router)();
-/**
- * @swagger
- * tags:
- *   name: Visit Status
- *   description: Visit status management endpoints
- */
-/**
- * @swagger
- * components:
- *   schemas:
- *     VisitStatus:
- *       type: object
- *       properties:
- *         id:
- *           type: string
- *         name:
- *           type: string
- *         status:
- *           type: boolean
- *           description: Whether this status is active or not
- *     CreateVisitStatusBody:
- *       type: object
- *       required:
- *         - name
- *         - status
- *       properties:
- *         name:
- *           type: string
- *           example: In Progress
- *         status:
- *           type: boolean
- *           example: true
- *     UpdateVisitStatusBody:
- *       type: object
- *       properties:
- *         name:
- *           type: string
- *         status:
- *           type: boolean
- */
-/**
- * @swagger
- * /api/admin/visit_status:
- *   get:
- *     summary: Get all visit statuses
- *     tags: [Visit Status]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of all visit statuses
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 allVisitStatuss:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/VisitStatus'
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
- */
-router.get("/", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(status_1.getAllVisitStatuss));
-/**
- * @swagger
- * /api/admin/visit_status/{id}:
- *   get:
- *     summary: Get visit status by ID
- *     tags: [Visit Status]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Visit status ID
- *     responses:
- *       200:
- *         description: Visit status data
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 VisitStatuss:
- *                   $ref: '#/components/schemas/VisitStatus'
- *       404:
- *         description: Visit status not found
- *       401:
- *         description: Unauthorized
- */
-router.get("/:id", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(status_1.getVisitStatussById));
-/**
- * @swagger
- * /api/admin/visit_status:
- *   post:
- *     summary: Create a new visit status
- *     tags: [Visit Status]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/CreateVisitStatusBody'
- *     responses:
- *       201:
- *         description: Visit status created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: VisitStatuss created successfully
- *       401:
- *         description: Unauthorized
- */
-router.post("/", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(status_1.createVisitStatuss));
-/**
- * @swagger
- * /api/admin/visit_status/{id}:
- *   put:
- *     summary: Update visit status by ID
- *     tags: [Visit Status]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Visit status ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/UpdateVisitStatusBody'
- *     responses:
- *       200:
- *         description: Visit status updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: VisitStatuss updated successfully
- *       404:
- *         description: Visit status not found
- *       401:
- *         description: Unauthorized
- */
-router.put("/:id", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(status_1.updateVisitStatuss));
-/**
- * @swagger
- * /api/admin/visit_status/{id}:
- *   delete:
- *     summary: Delete visit status by ID
- *     tags: [Visit Status]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Visit status ID
- *     responses:
- *       200:
- *         description: Visit status deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: VisitStatuss deleted successfully
- *       404:
- *         description: Visit status not found
- *       401:
- *         description: Unauthorized
- */
-router.delete("/:id", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(status_1.deleteVisitStatuss));
-exports.default = router;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var stdin_exports = {};
+__export(stdin_exports, {
+  default: () => stdin_default
+});
+module.exports = __toCommonJS(stdin_exports);
+var import_express = require("express");
+var import_status = require("../../controllers/admin/status");
+var import_catchAsync = require("../../utils/catchAsync");
+var import_checkpermission = require("../../middlewares/checkpermission");
+const router = (0, import_express.Router)();
+router.get("/", (0, import_checkpermission.checkOnlyAdmin)(), (0, import_catchAsync.catchAsync)(import_status.getAllVisitStatuss));
+router.get("/:id", (0, import_checkpermission.checkOnlyAdmin)(), (0, import_catchAsync.catchAsync)(import_status.getVisitStatussById));
+router.post("/", (0, import_checkpermission.checkOnlyAdmin)(), (0, import_catchAsync.catchAsync)(import_status.createVisitStatuss));
+router.put("/:id", (0, import_checkpermission.checkOnlyAdmin)(), (0, import_catchAsync.catchAsync)(import_status.updateVisitStatuss));
+router.delete("/:id", (0, import_checkpermission.checkOnlyAdmin)(), (0, import_catchAsync.catchAsync)(import_status.deleteVisitStatuss));
+var stdin_default = router;
