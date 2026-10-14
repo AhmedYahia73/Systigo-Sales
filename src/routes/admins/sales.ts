@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
     getAllSales,
+    filterSales,
     lists,
     getSalesById,
     createSales,
@@ -55,6 +56,22 @@ const router = Router();
  *         status:
  *           type: string
  *           enum: [active, inactive]
+ *         visits_count:
+ *           type: integer
+ *           description: Visits count where status = visit
+ *           example: 12
+ *         sales_count:
+ *           type: integer
+ *           description: Sales count where status = sales
+ *           example: 5
+ *         delivered_count:
+ *           type: integer
+ *           description: Delivered count where status = delivered
+ *           example: 3
+ *         total_visits:
+ *           type: integer
+ *           description: Total visits count
+ *           example: 20
  *     CreateSalesBody:
  *       type: object
  *       required:
@@ -144,13 +161,63 @@ const router = Router();
  * @swagger
  * /api/admin/sales:
  *   get:
- *     summary: Get all sales staff
+ *     summary: Get all sales staff with visit counts
  *     tags: [Sales]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by name, phone, or email
+ *       - in: query
+ *         name: leader_id
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filter by leader UUID
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [active, inactive]
+ *         description: Filter by salesman status
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Start date for visit counts (YYYY-MM-DD)
+ *       - in: query
+ *         name: to
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: End date for visit counts (YYYY-MM-DD)
+ *       - in: query
+ *         name: months
+ *         schema:
+ *           type: string
+ *         description: Comma-separated months for visit counts (e.g. 10 or 1,2,3)
+ *       - in: query
+ *         name: year
+ *         schema:
+ *           type: integer
+ *         description: Year for visit counts (e.g. 2026)
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
  *     responses:
  *       200:
- *         description: List of sales staff
+ *         description: List of sales staff with visits counts
  *         content:
  *           application/json:
  *             schema:
@@ -160,12 +227,111 @@ const router = Router();
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Sales'
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
  *       401:
  *         description: Unauthorized
  *       403:
  *         description: Forbidden
  */
 router.get("/", checkAdminLeader(), catchAsync(getAllSales));
+
+/**
+ * @swagger
+ * /api/admin/sales/filter:
+ *   get:
+ *     summary: Filter sales staff with visit counts (alias)
+ *     tags: [Sales]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by name, phone, or email
+ *       - in: query
+ *         name: leader_id
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filter by leader UUID
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [active, inactive]
+ *         description: Filter by salesman status
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Start date for visit counts (YYYY-MM-DD)
+ *       - in: query
+ *         name: to
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: End date for visit counts (YYYY-MM-DD)
+ *       - in: query
+ *         name: months
+ *         schema:
+ *           type: string
+ *         description: Comma-separated months for visit counts (e.g. 10 or 1,2,3)
+ *       - in: query
+ *         name: year
+ *         schema:
+ *           type: integer
+ *         description: Year for visit counts (e.g. 2026)
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *     responses:
+ *       200:
+ *         description: Filtered sales staff with visits counts
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 sales:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Sales'
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ */
+router.get("/filter", checkAdminLeader(), catchAsync(filterSales));
 
 /**
  * @swagger
