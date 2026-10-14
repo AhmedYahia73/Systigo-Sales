@@ -161,7 +161,7 @@ const router = Router();
  * @swagger
  * /api/admin/sales:
  *   get:
- *     summary: Get all sales staff with visit counts
+ *     summary: Get all sales staff
  *     tags: [Sales]
  *     security:
  *       - bearerAuth: []
@@ -178,34 +178,6 @@ const router = Router();
  *           format: uuid
  *         description: Filter by leader UUID
  *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [active, inactive]
- *         description: Filter by salesman status
- *       - in: query
- *         name: from
- *         schema:
- *           type: string
- *           format: date
- *         description: Start date for visit counts (YYYY-MM-DD)
- *       - in: query
- *         name: to
- *         schema:
- *           type: string
- *           format: date
- *         description: End date for visit counts (YYYY-MM-DD)
- *       - in: query
- *         name: months
- *         schema:
- *           type: string
- *         description: Comma-separated months for visit counts (e.g. 10 or 1,2,3)
- *       - in: query
- *         name: year
- *         schema:
- *           type: integer
- *         description: Year for visit counts (e.g. 2026)
- *       - in: query
  *         name: page
  *         schema:
  *           type: integer
@@ -217,7 +189,7 @@ const router = Router();
  *           default: 10
  *     responses:
  *       200:
- *         description: List of sales staff with visits counts
+ *         description: List of sales staff
  *         content:
  *           application/json:
  *             schema:
@@ -247,91 +219,86 @@ router.get("/", checkAdminLeader(), catchAsync(getAllSales));
 
 /**
  * @swagger
- * /api/admin/sales/filter:
+ * /api/admin/sales/filter/{id}:
  *   get:
- *     summary: Filter sales staff with visit counts (alias)
+ *     summary: Filter sales man by ID with visits counts
+ *     description: Returns phone, email, name, visits count (status=visit), sales count (status=sales), and delivered count (status=delivered) from visits.ts without pagination
  *     tags: [Sales]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *         description: Search by name, phone, or email
- *       - in: query
- *         name: leader_id
+ *       - in: path
+ *         name: id
+ *         required: true
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Filter by leader UUID
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [active, inactive]
- *         description: Filter by salesman status
+ *         description: Salesman UUID
  *       - in: query
  *         name: from
  *         schema:
  *           type: string
  *           format: date
- *         description: Start date for visit counts (YYYY-MM-DD)
+ *         description: Optional start date for visit counts (YYYY-MM-DD)
  *       - in: query
  *         name: to
  *         schema:
  *           type: string
  *           format: date
- *         description: End date for visit counts (YYYY-MM-DD)
+ *         description: Optional end date for visit counts (YYYY-MM-DD)
  *       - in: query
  *         name: months
  *         schema:
  *           type: string
- *         description: Comma-separated months for visit counts (e.g. 10 or 1,2,3)
+ *         description: Optional comma-separated months for visit counts (e.g. 10 or 1,2,3)
  *       - in: query
  *         name: year
  *         schema:
  *           type: integer
- *         description: Year for visit counts (e.g. 2026)
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
+ *         description: Optional year for visit counts (e.g. 2026)
  *     responses:
  *       200:
- *         description: Filtered sales staff with visits counts
+ *         description: Salesman data with visits counts
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 sales:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Sales'
- *                 pagination:
- *                   type: object
- *                   properties:
- *                     total:
- *                       type: integer
- *                     page:
- *                       type: integer
- *                     limit:
- *                       type: integer
- *                     totalPages:
- *                       type: integer
+ *                 id:
+ *                   type: string
+ *                   format: uuid
+ *                 name:
+ *                   type: string
+ *                   example: Mohamed Hassan
+ *                 email:
+ *                   type: string
+ *                   example: mohamed@example.com
+ *                 phone:
+ *                   type: string
+ *                   example: "01098765432"
+ *                 visits_count:
+ *                   type: integer
+ *                   description: visits count where status = visit
+ *                   example: 12
+ *                 sales_count:
+ *                   type: integer
+ *                   description: sales count where status = sales
+ *                   example: 5
+ *                 delivered_count:
+ *                   type: integer
+ *                   description: delivered count where status = delivered
+ *                   example: 3
+ *                 total_visits:
+ *                   type: integer
+ *                   example: 20
+ *       404:
+ *         description: Sales not found
  *       401:
  *         description: Unauthorized
  *       403:
  *         description: Forbidden
  */
-router.get("/filter", checkAdminLeader(), catchAsync(filterSales));
+router.get("/filter/:id", checkAdminLeader(), catchAsync(filterSales));
 
 /**
  * @swagger

@@ -83,21 +83,29 @@ export const getAllSalesSchema = z.object({
     leader_id: z.string().uuid().optional(),
     months: z.string().optional(),
     year: z.coerce.number().int().optional(),
-    from: z.string().optional(),
-    to: z.string().optional(),
-    status: z.enum(["active", "inactive"]).optional(),
-    user_date: z.string().optional(),
   }),
 });
 
-export const filterSalesSchema = getAllSalesSchema;
+export const filterSalesSchema = z.object({
+  params: z.object({
+    id: z.string({ required_error: "ID is required" }).uuid("Invalid sales ID format"),
+  }),
+  query: z.object({
+    from: z.string().optional(),
+    to: z.string().optional(),
+    months: z.string().optional(),
+    year: z.coerce.number().int().optional(),
+  }).optional(),
+});
+
+export const filterSalesByIdSchema = filterSalesSchema;
 
 
 // ==========================================
 // 🎮 Controllers
 // ==========================================
 
-// ✅ Get All Sales (مع إحصائيات الزيارات visits, sales, delivered والفلاتر)
+// ✅ Get All Sales (للـ Organization الحالية مع الـ Targets الخاصة بهم)
 export const getAllSales = async (req: Request, res: Response) => {
     await getAllSalesSchema.parseAsync({ query: req.query });
     const userRole = req.user?.role;
@@ -107,8 +115,7 @@ export const getAllSales = async (req: Request, res: Response) => {
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.max(1, parseInt(req.query.limit as string) || 10);
     const search = (req.query.search as string) || '';
-    const leaderIdParam = req.query.leader_id ? req.query.leader_id as string : null;
-    const statusParam = req.query.status as string;
+    const leaderIdParam = req.query.leader_id ? req.query.leader_id as string: null;
     
     const offset = (page - 1) * limit;
 
@@ -136,11 +143,6 @@ export const getAllSales = async (req: Request, res: Response) => {
         }
     }
 
-    // فلترة حالة مندوب المبيعات (active / inactive)
-    if (statusParam && (statusParam === "active" || statusParam === "inactive")) {
-        whereConditions.push(eq(users.status, statusParam));
-    }
-
     // 4. تطبيق البحث (Search) بالاسم، الهاتف، أو البريد الإلكتروني
     if (search.trim()) {
         const searchPattern = `%${search.trim()}%`;
@@ -153,39 +155,9 @@ export const getAllSales = async (req: Request, res: Response) => {
         );
     }
 
-    // 5. إعداد شروط التاريخ لجدول الزيارات (Visits Date Conditions)
-    const fromDateStr = req.query.from as string;
-    const toDateStr = req.query.to as string;
     const monthsParam = req.query.months as string;
     const yearParam = req.query.year as string;
-
-    const visitDateConditions: SQL[] = [];
-
-    if (fromDateStr) {
-        const fromDate = new Date(`${fromDateStr}T00:00:00.000Z`);
-        if (!isNaN(fromDate.getTime())) {
-            visitDateConditions.push(gte(visits.createdAt, fromDate));
-        }
-    }
-
-    if (toDateStr) {
-        const toDate = new Date(`${toDateStr}T23:59:59.999Z`);
-        if (!isNaN(toDate.getTime())) {
-            visitDateConditions.push(lte(visits.createdAt, toDate));
-        }
-    }
-
     if (monthsParam && yearParam) {
-        const months = monthsParam.split(',').map(Number).filter(m => !isNaN(m));
-        const year = Number(yearParam);
-        if (months.length > 0 && !isNaN(year)) {
-            visitDateConditions.push(inArray(sql`MONTH(${visits.createdAt})`, months));
-            visitDateConditions.push(eq(sql`YEAR(${visits.createdAt})`, year));
-        }
-    }
-
-    // فلترة تاريخ إنشاء حساب المستخدم اختياري إذا طُلبت
-    if (req.query.user_date === "true" && monthsParam && yearParam) {
         const months = monthsParam.split(',').map(Number).filter(m => !isNaN(m));
         const year = Number(yearParam);
         if (months.length > 0 && !isNaN(year)) {
@@ -194,39 +166,7 @@ export const getAllSales = async (req: Request, res: Response) => {
         }
     }
 
-    const visitDateFilterSql = visitDateConditions.length > 0
-        ? sql` AND ${and(...visitDateConditions)}`
-        : sql``;
-
-    // استعلامات العد لحالات الزيارات المختلفة الخاصة بمندوب المبيعات من visits.ts
-    const visitsCountSql = sql<number>`CAST(COALESCE((
-        SELECT COUNT(*) FROM ${visits} 
-        WHERE ${visits.sales_id} = ${users.id} 
-          AND ${visits.status} = 'visit'
-          ${visitDateFilterSql}
-    ), 0) AS UNSIGNED)`;
-
-    const salesCountSql = sql<number>`CAST(COALESCE((
-        SELECT COUNT(*) FROM ${visits} 
-        WHERE ${visits.sales_id} = ${users.id} 
-          AND ${visits.status} = 'sales'
-          ${visitDateFilterSql}
-    ), 0) AS UNSIGNED)`;
-
-    const deliveredCountSql = sql<number>`CAST(COALESCE((
-        SELECT COUNT(*) FROM ${visits} 
-        WHERE ${visits.sales_id} = ${users.id} 
-          AND ${visits.status} = 'delivered'
-          ${visitDateFilterSql}
-    ), 0) AS UNSIGNED)`;
-
-    const totalVisitsSql = sql<number>`CAST(COALESCE((
-        SELECT COUNT(*) FROM ${visits} 
-        WHERE ${visits.sales_id} = ${users.id}
-          ${visitDateFilterSql}
-    ), 0) AS UNSIGNED)`;
-
-    // 6. بناء استعلام البيانات الأساسي (Base Query)
+    // 5. بناء استعلام البيانات الأساسي (Base Query)
     let query = db
         .select({
             id: users.id,
@@ -238,10 +178,6 @@ export const getAllSales = async (req: Request, res: Response) => {
             leader_name: leaderAlias.name,
             leader_phone: leaderAlias.phone,
             status: users.status, 
-            visits_count: visitsCountSql,
-            sales_count: salesCountSql,
-            delivered_count: deliveredCountSql,
-            total_visits: totalVisitsSql,
             createdAt: users.createdAt
         })
         .from(users)
@@ -250,7 +186,7 @@ export const getAllSales = async (req: Request, res: Response) => {
         .orderBy(desc(users.createdAt))
         .$dynamic();
 
-    // 7. بناء استعلام الـ Count لحساب التوتال
+    // 6. بناء استعلام الـ Count لحساب التوتال
     let countQuery = db
         .select({ total: count() })
         .from(users)
@@ -263,24 +199,15 @@ export const getAllSales = async (req: Request, res: Response) => {
         countQuery = countQuery.where(finalWhere);
     }
 
-    // 8. تنفيذ الاستعلامين بالتوازي (Parallel Execution)
+    // 7. تنفيذ الاستعلامين بالتوازي (Parallel Execution)
     const [allSales, [{ total: totalCount }]] = await Promise.all([
         query.limit(limit).offset(offset),
         countQuery
     ]);
 
-    // تحويل الأرقام إلى Numbers صريحة
-    const formattedSales = allSales.map((sale: any) => ({
-        ...sale,
-        visits_count: Number(sale.visits_count || 0),
-        sales_count: Number(sale.sales_count || 0),
-        delivered_count: Number(sale.delivered_count || 0),
-        total_visits: Number(sale.total_visits || 0),
-    }));
-
-    // 9. إرسال النتيجة
+    // 8. إرسال النتيجة
     return SuccessResponse(res, { 
-        sales: formattedSales,
+        sales: allSales,
         pagination: {
             total: Number(totalCount),
             page,
@@ -290,7 +217,106 @@ export const getAllSales = async (req: Request, res: Response) => {
     }, 200);
 };
 
-export const filterSales = getAllSales;
+// ✅ Filter Sales Man By ID (يجيب phone, email, name, visits count, sales count, delivered count بدون pagination)
+export const filterSales = async (req: Request, res: Response) => {
+    const validated = await filterSalesSchema.parseAsync({
+        params: req.params,
+        query: req.query,
+    });
+    const { id } = validated.params;
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
+
+    // 1. التحقق من وجود مندوب المبيعات وصلاحية الوصول
+    const whereConditions: SQL[] = [
+        eq(users.id, id),
+        eq(users.role, "sales"),
+    ];
+
+    if (userRole === "leader") {
+        whereConditions.push(eq(users.leader_id, userId!));
+    }
+
+    const salesUser = await db
+        .select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            phone: users.phone,
+            image: users.image,
+            status: users.status,
+            createdAt: users.createdAt,
+        })
+        .from(users)
+        .where(and(...whereConditions))
+        .limit(1);
+
+    if (!salesUser[0]) {
+        throw new NotFound("Sales not found");
+    }
+
+    // 2. إعداد شروط التاريخ لجدول الزيارات (إن وُجدت في الـ Query)
+    const fromDateStr = req.query.from as string;
+    const toDateStr = req.query.to as string;
+    const monthsParam = req.query.months as string;
+    const yearParam = req.query.year as string;
+
+    const visitConditions: SQL[] = [eq(visits.sales_id, id)];
+
+    if (fromDateStr) {
+        const fromDate = new Date(`${fromDateStr}T00:00:00.000Z`);
+        if (!isNaN(fromDate.getTime())) {
+            visitConditions.push(gte(visits.createdAt, fromDate));
+        }
+    }
+
+    if (toDateStr) {
+        const toDate = new Date(`${toDateStr}T23:59:59.999Z`);
+        if (!isNaN(toDate.getTime())) {
+            visitConditions.push(lte(visits.createdAt, toDate));
+        }
+    }
+
+    if (monthsParam && yearParam) {
+        const months = monthsParam.split(',').map(Number).filter(m => !isNaN(m));
+        const year = Number(yearParam);
+        if (months.length > 0 && !isNaN(year)) {
+            visitConditions.push(inArray(sql`MONTH(${visits.createdAt})`, months));
+            visitConditions.push(eq(sql`YEAR(${visits.createdAt})`, year));
+        }
+    }
+
+    // 3. حساب عدد الزيارات لكل حالة من جدول visits.ts لمندوب المبيعات هذا
+    const [countsResult] = await db
+        .select({
+            visits_count: sql<number>`CAST(COALESCE(COUNT(CASE WHEN ${visits.status} = 'visit' THEN 1 END), 0) AS UNSIGNED)`,
+            sales_count: sql<number>`CAST(COALESCE(COUNT(CASE WHEN ${visits.status} = 'sales' THEN 1 END), 0) AS UNSIGNED)`,
+            delivered_count: sql<number>`CAST(COALESCE(COUNT(CASE WHEN ${visits.status} = 'delivered' THEN 1 END), 0) AS UNSIGNED)`,
+        })
+        .from(visits)
+        .where(and(...visitConditions));
+
+    const visits_count = Number(countsResult?.visits_count || 0);
+    const sales_count = Number(countsResult?.sales_count || 0);
+    const delivered_count = Number(countsResult?.delivered_count || 0);
+    const total_visits = visits_count + sales_count + delivered_count;
+
+    // 4. إرجاع بيانات مندوب المبيعات مع العدادات مباشرة بدون pagination
+    return SuccessResponse(res, {
+        id: salesUser[0].id,
+        name: salesUser[0].name,
+        email: salesUser[0].email,
+        phone: salesUser[0].phone,
+        visits_count,
+        sales_count,
+        delivered_count,
+        total_visits,
+        image: salesUser[0].image,
+        status: salesUser[0].status,
+    }, 200);
+};
+
+export const filterSalesById = filterSales;
 
 // ✅ Get Targets List (لإستخدامها في القائمة المنسدلة مثلاً)
 export const lists = async (req: Request, res: Response) => {
