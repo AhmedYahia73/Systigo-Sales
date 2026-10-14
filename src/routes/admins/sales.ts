@@ -221,7 +221,7 @@ router.get("/", checkAdminLeader(), catchAsync(getAllSales));
  * @swagger
  * /api/admin/sales/filter/{id}:
  *   get:
- *     summary: Filter sales man by ID with visits counts
+ *     summary: Filter sales man by ID
  *     description: Returns phone, email, name, visits count (status=visit), sales count (status=sales), and delivered count (status=delivered) from visits.ts without pagination
  *     tags: [Sales]
  *     security:
@@ -234,28 +234,6 @@ router.get("/", checkAdminLeader(), catchAsync(getAllSales));
  *           type: string
  *           format: uuid
  *         description: Salesman UUID
- *       - in: query
- *         name: from
- *         schema:
- *           type: string
- *           format: date
- *         description: Optional start date for visit counts (YYYY-MM-DD)
- *       - in: query
- *         name: to
- *         schema:
- *           type: string
- *           format: date
- *         description: Optional end date for visit counts (YYYY-MM-DD)
- *       - in: query
- *         name: months
- *         schema:
- *           type: string
- *         description: Optional comma-separated months for visit counts (e.g. 10 or 1,2,3)
- *       - in: query
- *         name: year
- *         schema:
- *           type: integer
- *         description: Optional year for visit counts (e.g. 2026)
  *     responses:
  *       200:
  *         description: Salesman data with visits counts
@@ -288,9 +266,6 @@ router.get("/", checkAdminLeader(), catchAsync(getAllSales));
  *                   type: integer
  *                   description: delivered count where status = delivered
  *                   example: 3
- *                 total_visits:
- *                   type: integer
- *                   example: 20
  *       404:
  *         description: Sales not found
  *       401:

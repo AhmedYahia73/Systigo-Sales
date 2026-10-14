@@ -90,12 +90,6 @@ export const filterSalesSchema = z.object({
   params: z.object({
     id: z.string({ required_error: "ID is required" }).uuid("Invalid sales ID format"),
   }),
-  query: z.object({
-    from: z.string().optional(),
-    to: z.string().optional(),
-    months: z.string().optional(),
-    year: z.coerce.number().int().optional(),
-  }).optional(),
 });
 
 export const filterSalesByIdSchema = filterSalesSchema;
@@ -221,7 +215,6 @@ export const getAllSales = async (req: Request, res: Response) => {
 export const filterSales = async (req: Request, res: Response) => {
     const validated = await filterSalesSchema.parseAsync({
         params: req.params,
-        query: req.query,
     });
     const { id } = validated.params;
     const userRole = req.user?.role;
@@ -243,9 +236,6 @@ export const filterSales = async (req: Request, res: Response) => {
             name: users.name,
             email: users.email,
             phone: users.phone,
-            image: users.image,
-            status: users.status,
-            createdAt: users.createdAt,
         })
         .from(users)
         .where(and(...whereConditions))
@@ -255,38 +245,7 @@ export const filterSales = async (req: Request, res: Response) => {
         throw new NotFound("Sales not found");
     }
 
-    // 2. إعداد شروط التاريخ لجدول الزيارات (إن وُجدت في الـ Query)
-    const fromDateStr = req.query.from as string;
-    const toDateStr = req.query.to as string;
-    const monthsParam = req.query.months as string;
-    const yearParam = req.query.year as string;
-
-    const visitConditions: SQL[] = [eq(visits.sales_id, id)];
-
-    if (fromDateStr) {
-        const fromDate = new Date(`${fromDateStr}T00:00:00.000Z`);
-        if (!isNaN(fromDate.getTime())) {
-            visitConditions.push(gte(visits.createdAt, fromDate));
-        }
-    }
-
-    if (toDateStr) {
-        const toDate = new Date(`${toDateStr}T23:59:59.999Z`);
-        if (!isNaN(toDate.getTime())) {
-            visitConditions.push(lte(visits.createdAt, toDate));
-        }
-    }
-
-    if (monthsParam && yearParam) {
-        const months = monthsParam.split(',').map(Number).filter(m => !isNaN(m));
-        const year = Number(yearParam);
-        if (months.length > 0 && !isNaN(year)) {
-            visitConditions.push(inArray(sql`MONTH(${visits.createdAt})`, months));
-            visitConditions.push(eq(sql`YEAR(${visits.createdAt})`, year));
-        }
-    }
-
-    // 3. حساب عدد الزيارات لكل حالة من جدول visits.ts لمندوب المبيعات هذا
+    // 2. حساب عدد الزيارات لكل حالة من جدول visits.ts لمندوب المبيعات بالـ ID فقط
     const [countsResult] = await db
         .select({
             visits_count: sql<number>`CAST(COALESCE(COUNT(CASE WHEN ${visits.status} = 'visit' THEN 1 END), 0) AS UNSIGNED)`,
@@ -294,14 +253,13 @@ export const filterSales = async (req: Request, res: Response) => {
             delivered_count: sql<number>`CAST(COALESCE(COUNT(CASE WHEN ${visits.status} = 'delivered' THEN 1 END), 0) AS UNSIGNED)`,
         })
         .from(visits)
-        .where(and(...visitConditions));
+        .where(eq(visits.sales_id, id));
 
     const visits_count = Number(countsResult?.visits_count || 0);
     const sales_count = Number(countsResult?.sales_count || 0);
     const delivered_count = Number(countsResult?.delivered_count || 0);
-    const total_visits = visits_count + sales_count + delivered_count;
 
-    // 4. إرجاع بيانات مندوب المبيعات مع العدادات مباشرة بدون pagination
+    // 3. إرجاع بيانات مندوب المبيعات المطلوبة (phone, email, name, visits_count, sales_count, delivered_count)
     return SuccessResponse(res, {
         id: salesUser[0].id,
         name: salesUser[0].name,
@@ -310,9 +268,6 @@ export const filterSales = async (req: Request, res: Response) => {
         visits_count,
         sales_count,
         delivered_count,
-        total_visits,
-        image: salesUser[0].image,
-        status: salesUser[0].status,
     }, 200);
 };
 
