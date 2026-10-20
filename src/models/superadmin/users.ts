@@ -19,7 +19,7 @@ import "dotenv/config";
 const parentDbName = process.env.TASKITO_DB_NAME || process.env.PARENT_DB_NAME;
 
 function createUsersTable<T extends Record<string, any>>(name: string, columns: T) {
-  if (parentDbName) {
+  if (parentDbName && process.env.DB_NAME && parentDbName !== process.env.DB_NAME) {
     return mysqlSchema(parentDbName).table(name, columns);
   }
   return mysqlTable(name, columns);
