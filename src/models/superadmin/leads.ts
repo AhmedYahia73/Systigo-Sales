@@ -7,13 +7,13 @@ import {
   json,
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
-import { users } from "./users";
 
 export const leads = mysqlTable("leads", {
   id: char("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
   name: varchar("name", { length: 255 }).notNull(),
   phone: varchar("phone", { length: 20 }).notNull(),
-  sales_id: char("sales_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+  // References Parent DB (Taskito) users.id via cross-database queries
+  sales_id: char("sales_id", { length: 36 }),
   place_name: varchar("place_name", { length: 255 }),
   place_phone: varchar("place_phone", { length: 20 }),
   lat: double("lat").notNull(),
