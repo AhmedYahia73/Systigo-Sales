@@ -1,52 +1,67 @@
-var __create = Object.create;
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
 };
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var stdin_exports = {};
-__export(stdin_exports, {
-  db: () => db,
-  pool: () => pool
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.taskitoPool = exports.taskitoDb = exports.pool = exports.db = void 0;
+const mysql2_1 = require("drizzle-orm/mysql2");
+const promise_1 = __importDefault(require("mysql2/promise"));
+const schema = __importStar(require("./schema"));
+require("dotenv/config");
+// 1. Primary Database Connection Pool (Systigo-Sales)
+const pool = promise_1.default.createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
 });
-module.exports = __toCommonJS(stdin_exports);
-var import_mysql2 = require("drizzle-orm/mysql2");
-var import_promise = __toESM(require("mysql2/promise"));
-var schema = __toESM(require("./schema"));
-var import_config = require("dotenv/config");
-const pool = import_promise.default.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
+exports.pool = pool;
+exports.db = (0, mysql2_1.drizzle)(pool, { schema, mode: "default" });
+// 2. Parent Database Connection Pool (Taskito HRM - Parent DB)
+const taskitoPool = promise_1.default.createPool({
+    host: process.env.TASKITO_DB_HOST || process.env.DB_HOST || "localhost",
+    user: process.env.TASKITO_DB_USER || process.env.DB_USER,
+    password: process.env.TASKITO_DB_PASSWORD || process.env.DB_PASSWORD,
+    database: process.env.TASKITO_DB_NAME || "wegostation_tasketo",
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
 });
-const db = (0, import_mysql2.drizzle)(pool, { schema, mode: "default" });
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  db,
-  pool
-});
+exports.taskitoPool = taskitoPool;
+exports.taskitoDb = (0, mysql2_1.drizzle)(taskitoPool, { schema, mode: "default" });

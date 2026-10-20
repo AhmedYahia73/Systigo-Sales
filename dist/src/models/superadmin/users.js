@@ -1,43 +1,39 @@
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var stdin_exports = {};
-__export(stdin_exports, {
-  users: () => users
-});
-module.exports = __toCommonJS(stdin_exports);
-var import_mysql_core = require("drizzle-orm/mysql-core");
-var import_drizzle_orm = require("drizzle-orm");
-var import_targets = require("./targets");
-const users = (0, import_mysql_core.mysqlTable)("users", {
-  id: (0, import_mysql_core.char)("id", { length: 36 }).primaryKey().default(import_drizzle_orm.sql`(UUID())`),
-  name: (0, import_mysql_core.varchar)("name", { length: 200 }).notNull(),
-  email: (0, import_mysql_core.varchar)("email", { length: 100 }).notNull().unique(),
-  phone: (0, import_mysql_core.varchar)("phone", { length: 20 }).notNull().unique(),
-  image: (0, import_mysql_core.varchar)("image", { length: 200 }),
-  password: (0, import_mysql_core.varchar)("password", { length: 255 }).notNull(),
-  status: (0, import_mysql_core.mysqlEnum)("status", ["active", "inactive"]).default("active"),
-  role: (0, import_mysql_core.mysqlEnum)("role", ["admin", "leader", "sales"]).notNull().default("sales"),
-  leader_id: (0, import_mysql_core.char)("leader_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
-  target_id: (0, import_mysql_core.char)("target_id", { length: 36 }).references(() => import_targets.targets.id, { onDelete: "set null" }),
-  createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
-  updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow().onUpdateNow()
-});
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  users
+"use strict";
+// src/models/schema/users.ts
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.users = void 0;
+const mysql_core_1 = require("drizzle-orm/mysql-core");
+const drizzle_orm_1 = require("drizzle-orm");
+require("dotenv/config");
+// If TASKITO_DB_NAME / PARENT_DB_NAME is provided in .env, users table will reference the Parent DB schema
+const parentDbName = process.env.TASKITO_DB_NAME || process.env.PARENT_DB_NAME;
+function createUsersTable(name, columns) {
+    if (parentDbName && process.env.DB_NAME && parentDbName !== process.env.DB_NAME) {
+        return (0, mysql_core_1.mysqlSchema)(parentDbName).table(name, columns);
+    }
+    return (0, mysql_core_1.mysqlTable)(name, columns);
+}
+exports.users = createUsersTable("users", {
+    id: (0, mysql_core_1.char)("id", { length: 36 }).primaryKey().default((0, drizzle_orm_1.sql) `(UUID())`),
+    name: (0, mysql_core_1.varchar)("name", { length: 200 }).notNull(),
+    email: (0, mysql_core_1.varchar)("email", { length: 100 }).notNull().unique(),
+    phone: (0, mysql_core_1.varchar)("phone", { length: 20 }).notNull().unique(),
+    whatsapp: (0, mysql_core_1.varchar)("whatsapp", { length: 20 }),
+    image: (0, mysql_core_1.varchar)("image", { length: 200 }),
+    vector_image_array: (0, mysql_core_1.json)("vector_image_array"),
+    password: (0, mysql_core_1.varchar)("password", { length: 255 }).notNull(),
+    status: (0, mysql_core_1.mysqlEnum)("status", ["active", "inactive"]).default("active"),
+    role: (0, mysql_core_1.mysqlEnum)("role", ["super_admin", "admin", "tester", "engineer", "leader", "sales"]).notNull().default("sales"),
+    points: (0, mysql_core_1.int)("points").default(0),
+    yearly_holidays: (0, mysql_core_1.boolean)("yearly_holidays").default(false),
+    zone_id: (0, mysql_core_1.char)("zone_id", { length: 36 }),
+    shift_id: (0, mysql_core_1.char)("shift_id", { length: 36 }),
+    department_id: (0, mysql_core_1.char)("department_id", { length: 36 }),
+    // Sales CRM Integration Fields
+    leader_id: (0, mysql_core_1.char)("leader_id", { length: 36 }).references(() => exports.users.id, { onDelete: "set null" }),
+    target_id: (0, mysql_core_1.char)("target_id", { length: 36 }),
+    sales_project_id: (0, mysql_core_1.char)("sales_project_id", { length: 36 }),
+    sales_project_ids: (0, mysql_core_1.json)("sales_project_ids"),
+    createdAt: (0, mysql_core_1.timestamp)("created_at").defaultNow(),
+    updatedAt: (0, mysql_core_1.timestamp)("updated_at").defaultNow().onUpdateNow(),
 });

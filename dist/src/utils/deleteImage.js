@@ -1,54 +1,30 @@
-var __create = Object.create;
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
 };
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var stdin_exports = {};
-__export(stdin_exports, {
-  deletePhotoFromServer: () => deletePhotoFromServer
-});
-module.exports = __toCommonJS(stdin_exports);
-var import_promises = __toESM(require("fs/promises"));
-var import_path = __toESM(require("path"));
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.deletePhotoFromServer = void 0;
+const promises_1 = __importDefault(require("fs/promises"));
+const path_1 = __importDefault(require("path"));
 const deletePhotoFromServer = async (imageUrlOrPath) => {
-  try {
-    let relativePath = imageUrlOrPath;
-    if (imageUrlOrPath.startsWith("http")) {
-      const url = new URL(imageUrlOrPath);
-      relativePath = url.pathname.startsWith("/") ? url.pathname.slice(1) : url.pathname;
+    try {
+        // استخراج المسار النسبي من الـ URL أو استخدامه مباشرة
+        let relativePath = imageUrlOrPath;
+        // لو كان URL كامل، نستخرج المسار
+        if (imageUrlOrPath.startsWith("http")) {
+            const url = new URL(imageUrlOrPath);
+            relativePath = url.pathname.startsWith("/")
+                ? url.pathname.slice(1)
+                : url.pathname;
+        }
+        const filePath = path_1.default.join(__dirname, "../..", relativePath);
+        await promises_1.default.access(filePath);
+        await promises_1.default.unlink(filePath);
+        return true;
     }
-    const filePath = import_path.default.join(__dirname, "../..", relativePath);
-    await import_promises.default.access(filePath);
-    await import_promises.default.unlink(filePath);
-    return true;
-  } catch (err) {
-    console.error("Error deleting photo:", err);
-    return false;
-  }
+    catch (err) {
+        console.error("Error deleting photo:", err);
+        return false; // لا نرمي خطأ، فقط نرجع false
+    }
 };
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  deletePhotoFromServer
-});
+exports.deletePhotoFromServer = deletePhotoFromServer;

@@ -1,164 +1,179 @@
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc2) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc2 = __getOwnPropDesc(from, key)) || desc2.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var stdin_exports = {};
-__export(stdin_exports, {
-  changeStatus: () => changeStatus,
-  getHistoryRequest: () => getHistoryRequest,
-  getPendingRequest: () => getPendingRequest,
-  getRequestsSchema: () => getRequestsSchema,
-  requestIdSchema: () => requestIdSchema
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.changeStatus = exports.getHistoryRequest = exports.getPendingRequest = exports.getRequestsSchema = exports.requestIdSchema = void 0;
+const db_1 = require("../../models/db");
+const schema_1 = require("../../models/schema");
+const response_1 = require("../../utils/response");
+const NotFound_1 = require("../../Errors/NotFound");
+const zod_1 = require("zod");
+const drizzle_orm_1 = require("drizzle-orm");
+const visits_1 = require("./visits");
+// ==========================================
+// 🛡️ Zod Validation Schemas
+// ==========================================
+exports.requestIdSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        id: zod_1.z.string({ required_error: "ID is required in parameters" }).uuid("Invalid ID format"),
+    }),
+    body: zod_1.z.object({
+        status: zod_1.z.enum(["approve", "reject"], {
+            required_error: "Action status is required",
+            invalid_type_error: "Status must be either 'approve' or 'reject'",
+        }),
+    }),
 });
-module.exports = __toCommonJS(stdin_exports);
-var import_db = require("../../models/db");
-var import_schema = require("../../models/schema");
-var import_response = require("../../utils/response");
-var import_NotFound = require("../../Errors/NotFound");
-var import_zod = require("zod");
-var import_drizzle_orm = require("drizzle-orm");
-var import_visits = require("./visits");
-const requestIdSchema = import_zod.z.object({
-  params: import_zod.z.object({
-    id: import_zod.z.string({ required_error: "ID is required in parameters" }).uuid("Invalid ID format")
-  }),
-  body: import_zod.z.object({
-    status: import_zod.z.enum(["approve", "reject"], {
-      required_error: "Action status is required",
-      invalid_type_error: "Status must be either 'approve' or 'reject'"
-    })
-  })
+exports.getRequestsSchema = zod_1.z.object({
+    query: zod_1.z.object({
+        page: zod_1.z.coerce.number().int().positive().optional(),
+        limit: zod_1.z.coerce.number().int().positive().optional(),
+        search: zod_1.z.string().optional(),
+    }),
 });
-const getRequestsSchema = import_zod.z.object({
-  query: import_zod.z.object({
-    page: import_zod.z.coerce.number().int().positive().optional(),
-    limit: import_zod.z.coerce.number().int().positive().optional(),
-    search: import_zod.z.string().optional()
-  })
-});
+// ==========================================
+// 🎮 Controllers
+// ==========================================
+// ✅ Get Pending Requests
 const getPendingRequest = async (req, res) => {
-  await getRequestsSchema.parseAsync({ query: req.query });
-  const page = Math.max(1, parseInt(req.query.page) || 1);
-  const limit = Math.max(1, parseInt(req.query.limit) || 10);
-  const search = (req.query.search || "").trim();
-  const offset = (page - 1) * limit;
-  const baseCondition = (0, import_drizzle_orm.eq)(import_schema.statusRequest.status, "pending");
-  const leaderCondition = req.user?.role === "leader" ? (0, import_drizzle_orm.eq)(import_schema.users.leader_id, req.user?.id) : void 0;
-  const searchCondition = search ? (0, import_drizzle_orm.or)(
-    (0, import_drizzle_orm.like)(import_schema.users.name, `%${search}%`),
-    (0, import_drizzle_orm.like)(import_schema.users.phone, `%${search}%`),
-    (0, import_drizzle_orm.like)(import_schema.visits.name, `%${search}%`)
-  ) : void 0;
-  const whereClause = (0, import_drizzle_orm.and)(baseCondition, leaderCondition, searchCondition);
-  const pendingRequests = await import_db.db.select({
-    id: import_schema.statusRequest.id,
-    user_name: import_schema.users.name,
-    user_phone: import_schema.users.phone,
-    visit_name: import_schema.visits.name,
-    from: import_schema.statusRequest.from,
-    to: import_schema.statusRequest.to,
-    status: import_schema.statusRequest.status,
-    createdAt: import_schema.statusRequest.createdAt
-  }).from(import_schema.statusRequest).leftJoin(import_schema.users, (0, import_drizzle_orm.eq)(import_schema.statusRequest.userId, import_schema.users.id)).leftJoin(import_schema.visits, (0, import_drizzle_orm.eq)(import_schema.statusRequest.visitId, import_schema.visits.id)).where(whereClause).orderBy((0, import_drizzle_orm.desc)(import_schema.statusRequest.createdAt)).limit(limit).offset(offset);
-  const [{ total }] = await import_db.db.select({ total: (0, import_drizzle_orm.count)() }).from(import_schema.statusRequest).leftJoin(import_schema.users, (0, import_drizzle_orm.eq)(import_schema.statusRequest.userId, import_schema.users.id)).leftJoin(import_schema.visits, (0, import_drizzle_orm.eq)(import_schema.statusRequest.visitId, import_schema.visits.id)).where(whereClause);
-  const totalPages = Math.ceil(total / limit);
-  (0, import_response.SuccessResponse)(res, {
-    pendingRequests,
-    pagination: {
-      totalItems: total,
-      totalPages,
-      currentPage: page,
-      limit,
-      hasNextPage: page < totalPages,
-      hasPrevPage: page > 1
-    }
-  }, 200);
+    await exports.getRequestsSchema.parseAsync({ query: req.query });
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 10);
+    const search = (req.query.search || '').trim();
+    const offset = (page - 1) * limit;
+    const baseCondition = (0, drizzle_orm_1.eq)(schema_1.statusRequest.status, 'pending');
+    const leaderCondition = req.user?.role === "leader"
+        ? (0, drizzle_orm_1.eq)(schema_1.users.leader_id, req.user?.id)
+        : undefined;
+    const searchCondition = search
+        ? (0, drizzle_orm_1.or)((0, drizzle_orm_1.like)(schema_1.users.name, `%${search}%`), (0, drizzle_orm_1.like)(schema_1.users.phone, `%${search}%`), (0, drizzle_orm_1.like)(schema_1.visits.name, `%${search}%`))
+        : undefined;
+    const whereClause = (0, drizzle_orm_1.and)(baseCondition, leaderCondition, searchCondition);
+    const pendingRequests = await db_1.db
+        .select({
+        id: schema_1.statusRequest.id,
+        user_name: schema_1.users.name,
+        user_phone: schema_1.users.phone,
+        visit_name: schema_1.visits.name,
+        from: schema_1.statusRequest.from,
+        to: schema_1.statusRequest.to,
+        status: schema_1.statusRequest.status,
+        createdAt: schema_1.statusRequest.createdAt,
+    })
+        .from(schema_1.statusRequest)
+        .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.statusRequest.userId, schema_1.users.id))
+        .leftJoin(schema_1.visits, (0, drizzle_orm_1.eq)(schema_1.statusRequest.visitId, schema_1.visits.id))
+        .where(whereClause)
+        .orderBy((0, drizzle_orm_1.desc)(schema_1.statusRequest.createdAt))
+        .limit(limit)
+        .offset(offset);
+    const [{ total }] = await db_1.db
+        .select({ total: (0, drizzle_orm_1.count)() })
+        .from(schema_1.statusRequest)
+        .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.statusRequest.userId, schema_1.users.id))
+        .leftJoin(schema_1.visits, (0, drizzle_orm_1.eq)(schema_1.statusRequest.visitId, schema_1.visits.id))
+        .where(whereClause);
+    const totalPages = Math.ceil(total / limit);
+    (0, response_1.SuccessResponse)(res, {
+        pendingRequests,
+        pagination: {
+            totalItems: total,
+            totalPages,
+            currentPage: page,
+            limit,
+            hasNextPage: page < totalPages,
+            hasPrevPage: page > 1
+        }
+    }, 200);
 };
+exports.getPendingRequest = getPendingRequest;
+// ✅ Get History Requests
 const getHistoryRequest = async (req, res) => {
-  await getRequestsSchema.parseAsync({ query: req.query });
-  const page = Math.max(1, parseInt(req.query.page) || 1);
-  const limit = Math.max(1, parseInt(req.query.limit) || 10);
-  const search = (req.query.search || "").trim();
-  const offset = (page - 1) * limit;
-  const baseCondition = (0, import_drizzle_orm.ne)(import_schema.statusRequest.status, "pending");
-  const leaderCondition = req.user?.role === "leader" ? (0, import_drizzle_orm.eq)(import_schema.users.leader_id, req.user?.id) : void 0;
-  const searchCondition = search ? (0, import_drizzle_orm.or)(
-    (0, import_drizzle_orm.like)(import_schema.users.name, `%${search}%`),
-    (0, import_drizzle_orm.like)(import_schema.users.phone, `%${search}%`),
-    (0, import_drizzle_orm.like)(import_schema.visits.name, `%${search}%`)
-  ) : void 0;
-  const whereClause = (0, import_drizzle_orm.and)(baseCondition, leaderCondition, searchCondition);
-  const historyRequests = await import_db.db.select({
-    id: import_schema.statusRequest.id,
-    user_name: import_schema.users.name,
-    user_phone: import_schema.users.phone,
-    visit_name: import_schema.visits.name,
-    from: import_schema.statusRequest.from,
-    to: import_schema.statusRequest.to,
-    status: import_schema.statusRequest.status,
-    createdAt: import_schema.statusRequest.createdAt
-  }).from(import_schema.statusRequest).leftJoin(import_schema.users, (0, import_drizzle_orm.eq)(import_schema.statusRequest.userId, import_schema.users.id)).leftJoin(import_schema.visits, (0, import_drizzle_orm.eq)(import_schema.statusRequest.visitId, import_schema.visits.id)).where(whereClause).orderBy((0, import_drizzle_orm.desc)(import_schema.statusRequest.createdAt)).limit(limit).offset(offset);
-  const [{ total }] = await import_db.db.select({ total: (0, import_drizzle_orm.count)() }).from(import_schema.statusRequest).leftJoin(import_schema.users, (0, import_drizzle_orm.eq)(import_schema.statusRequest.userId, import_schema.users.id)).leftJoin(import_schema.visits, (0, import_drizzle_orm.eq)(import_schema.statusRequest.visitId, import_schema.visits.id)).where(whereClause);
-  const totalPages = Math.ceil(total / limit);
-  (0, import_response.SuccessResponse)(res, {
-    historyRequests,
-    pagination: {
-      totalItems: total,
-      totalPages,
-      currentPage: page,
-      limit,
-      hasNextPage: page < totalPages,
-      hasPrevPage: page > 1
-    }
-  }, 200);
+    await exports.getRequestsSchema.parseAsync({ query: req.query });
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 10);
+    const search = (req.query.search || '').trim();
+    const offset = (page - 1) * limit;
+    const baseCondition = (0, drizzle_orm_1.ne)(schema_1.statusRequest.status, 'pending');
+    const leaderCondition = req.user?.role === "leader"
+        ? (0, drizzle_orm_1.eq)(schema_1.users.leader_id, req.user?.id)
+        : undefined;
+    const searchCondition = search
+        ? (0, drizzle_orm_1.or)((0, drizzle_orm_1.like)(schema_1.users.name, `%${search}%`), (0, drizzle_orm_1.like)(schema_1.users.phone, `%${search}%`), (0, drizzle_orm_1.like)(schema_1.visits.name, `%${search}%`))
+        : undefined;
+    const whereClause = (0, drizzle_orm_1.and)(baseCondition, leaderCondition, searchCondition);
+    const historyRequests = await db_1.db
+        .select({
+        id: schema_1.statusRequest.id,
+        user_name: schema_1.users.name,
+        user_phone: schema_1.users.phone,
+        visit_name: schema_1.visits.name,
+        from: schema_1.statusRequest.from,
+        to: schema_1.statusRequest.to,
+        status: schema_1.statusRequest.status,
+        createdAt: schema_1.statusRequest.createdAt,
+    })
+        .from(schema_1.statusRequest)
+        .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.statusRequest.userId, schema_1.users.id))
+        .leftJoin(schema_1.visits, (0, drizzle_orm_1.eq)(schema_1.statusRequest.visitId, schema_1.visits.id))
+        .where(whereClause)
+        .orderBy((0, drizzle_orm_1.desc)(schema_1.statusRequest.createdAt))
+        .limit(limit)
+        .offset(offset);
+    const [{ total }] = await db_1.db
+        .select({ total: (0, drizzle_orm_1.count)() })
+        .from(schema_1.statusRequest)
+        .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.statusRequest.userId, schema_1.users.id))
+        .leftJoin(schema_1.visits, (0, drizzle_orm_1.eq)(schema_1.statusRequest.visitId, schema_1.visits.id))
+        .where(whereClause);
+    const totalPages = Math.ceil(total / limit);
+    (0, response_1.SuccessResponse)(res, {
+        historyRequests,
+        pagination: {
+            totalItems: total,
+            totalPages,
+            currentPage: page,
+            limit,
+            hasNextPage: page < totalPages,
+            hasPrevPage: page > 1
+        }
+    }, 200);
 };
+exports.getHistoryRequest = getHistoryRequest;
+// ✅ Change Request Status
 const changeStatus = async (req, res) => {
-  const validated = await requestIdSchema.parseAsync({ params: req.params, body: req.body });
-  const id = validated.params.id;
-  const status = validated.body.status;
-  const existRequest = await import_db.db.select({
-    id: import_schema.statusRequest.id,
-    from: import_schema.statusRequest.from,
-    to: import_schema.statusRequest.to,
-    visitId: import_schema.statusRequest.visitId
-  }).from(import_schema.statusRequest).where((0, import_drizzle_orm.eq)(import_schema.statusRequest.id, id)).limit(1);
-  if (!existRequest.length) {
-    throw new import_NotFound.NotFound("Request not found");
-  }
-  await import_db.db.update(import_schema.statusRequest).set({ status }).where((0, import_drizzle_orm.eq)(import_schema.statusRequest.id, id));
-  if (status === "approve") {
-    const visitUpdateData = { status: existRequest[0].to };
-    if (existRequest[0].to === "sales" || existRequest[0].to === "delivered") {
-      const visit = await import_db.db.select().from(import_schema.visits).where((0, import_drizzle_orm.eq)(import_schema.visits.id, existRequest[0].visitId)).limit(1);
-      if (visit[0] && visit[0].products) {
-        const parsedProducts = (0, import_visits.parseProductsArray)(visit[0].products);
-        visitUpdateData.points = await (0, import_visits.calculatePointsForProducts)(parsedProducts);
-      }
-    } else {
-      visitUpdateData.points = 0;
+    const validated = await exports.requestIdSchema.parseAsync({ params: req.params, body: req.body });
+    const id = validated.params.id;
+    const status = validated.body.status;
+    const existRequest = await db_1.db.select({
+        id: schema_1.statusRequest.id,
+        from: schema_1.statusRequest.from,
+        to: schema_1.statusRequest.to,
+        visitId: schema_1.statusRequest.visitId,
+    })
+        .from(schema_1.statusRequest)
+        .where((0, drizzle_orm_1.eq)(schema_1.statusRequest.id, id))
+        .limit(1);
+    if (!existRequest.length) {
+        throw new NotFound_1.NotFound("Request not found");
     }
-    await import_db.db.update(import_schema.visits).set(visitUpdateData).where((0, import_drizzle_orm.eq)(import_schema.visits.id, existRequest[0].visitId));
-  }
-  (0, import_response.SuccessResponse)(res, { message: "Status updated successfully" }, 200);
+    await db_1.db.update(schema_1.statusRequest)
+        .set({ status })
+        .where((0, drizzle_orm_1.eq)(schema_1.statusRequest.id, id));
+    if (status === "approve") {
+        const visitUpdateData = { status: existRequest[0].to };
+        if (existRequest[0].to === "sales" || existRequest[0].to === "delivered") {
+            const visit = await db_1.db.select().from(schema_1.visits).where((0, drizzle_orm_1.eq)(schema_1.visits.id, existRequest[0].visitId)).limit(1);
+            if (visit[0] && visit[0].products) {
+                const parsedProducts = (0, visits_1.parseProductsArray)(visit[0].products);
+                visitUpdateData.points = await (0, visits_1.calculatePointsForProducts)(parsedProducts);
+            }
+        }
+        else {
+            visitUpdateData.points = 0;
+        }
+        await db_1.db.update(schema_1.visits)
+            .set(visitUpdateData)
+            .where((0, drizzle_orm_1.eq)(schema_1.visits.id, existRequest[0].visitId));
+    }
+    (0, response_1.SuccessResponse)(res, { message: "Status updated successfully" }, 200);
 };
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  changeStatus,
-  getHistoryRequest,
-  getPendingRequest,
-  getRequestsSchema,
-  requestIdSchema
-});
+exports.changeStatus = changeStatus;

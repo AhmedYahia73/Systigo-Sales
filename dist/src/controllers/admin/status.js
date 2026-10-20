@@ -1,131 +1,136 @@
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var stdin_exports = {};
-__export(stdin_exports, {
-  VisitStatusIdSchema: () => VisitStatusIdSchema,
-  createVisitStatusSchema: () => createVisitStatusSchema,
-  createVisitStatuss: () => createVisitStatuss,
-  deleteVisitStatuss: () => deleteVisitStatuss,
-  getAllVisitStatuss: () => getAllVisitStatuss,
-  getVisitStatussById: () => getVisitStatussById,
-  updateVisitStatusSchema: () => updateVisitStatusSchema,
-  updateVisitStatuss: () => updateVisitStatuss
+"use strict";
+// src/controllers/Sales/SalesController.ts
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.deleteVisitStatuss = exports.updateVisitStatuss = exports.createVisitStatuss = exports.getVisitStatussById = exports.getAllVisitStatuss = exports.VisitStatusIdSchema = exports.updateVisitStatusSchema = exports.createVisitStatusSchema = void 0;
+const db_1 = require("../../models/db");
+const schema_1 = require("../../models/schema");
+const drizzle_orm_1 = require("drizzle-orm");
+const response_1 = require("../../utils/response");
+const NotFound_1 = require("../../Errors/NotFound");
+const zod_1 = require("zod");
+// ==========================================
+// 🛡️ Zod Validation Schemas
+// ==========================================
+// الـ Schema الخاص بإنشاء هدف جديد
+exports.createVisitStatusSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        name: zod_1.z.string({
+            required_error: "Name is required",
+        }).min(1, "Name cannot be empty"),
+        status: zod_1.z.boolean({
+            required_error: "Status is required",
+            invalid_type_error: "Status must be a boolean (true or false)",
+        }),
+    }),
 });
-module.exports = __toCommonJS(stdin_exports);
-var import_db = require("../../models/db");
-var import_schema = require("../../models/schema");
-var import_drizzle_orm = require("drizzle-orm");
-var import_response = require("../../utils/response");
-var import_NotFound = require("../../Errors/NotFound");
-var import_zod = require("zod");
-const createVisitStatusSchema = import_zod.z.object({
-  body: import_zod.z.object({
-    name: import_zod.z.string({
-      required_error: "Name is required"
-    }).min(1, "Name cannot be empty"),
-    status: import_zod.z.boolean({
-      required_error: "Status is required",
-      invalid_type_error: "Status must be a boolean (true or false)"
-    })
-  })
+// الـ Schema الخاص بتحديث هدف (البيانات اختيارية ولكن إذا أُرسلت يجب أن تكون صالحة)
+exports.updateVisitStatusSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        id: zod_1.z.string({ required_error: "ID is required in parameters" }), // غيرها لـ z.coerce.number() لو الـ ID رقم في الداتابيز
+    }),
+    body: zod_1.z.object({
+        name: zod_1.z.string().min(1, "Name cannot be empty").optional(),
+        status: zod_1.z.boolean({ invalid_type_error: "Status must be a boolean" }).optional(),
+    }),
 });
-const updateVisitStatusSchema = import_zod.z.object({
-  params: import_zod.z.object({
-    id: import_zod.z.string({ required_error: "ID is required in parameters" })
-    // غيرها لـ z.coerce.number() لو الـ ID رقم في الداتابيز
-  }),
-  body: import_zod.z.object({
-    name: import_zod.z.string().min(1, "Name cannot be empty").optional(),
-    status: import_zod.z.boolean({ invalid_type_error: "Status must be a boolean" }).optional()
-  })
+// الـ Schema الخاص بالعمليات التي تتطلب ID فقط (مثل جلب عنصر محدد أو حذفه)
+exports.VisitStatusIdSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        id: zod_1.z.string({ required_error: "ID is required in parameters" }), // غيرها لـ z.coerce.number() لو الـ ID رقم
+    }),
 });
-const VisitStatusIdSchema = import_zod.z.object({
-  params: import_zod.z.object({
-    id: import_zod.z.string({ required_error: "ID is required in parameters" })
-    // غيرها لـ z.coerce.number() لو الـ ID رقم
-  })
-});
+// ==========================================
+// 🎮 Controllers
+// ==========================================
+// ✅ Get All VisitStatuss
 const getAllVisitStatuss = async (req, res) => {
-  const query = import_db.db.select({
-    id: import_schema.visitStatus.id,
-    name: import_schema.visitStatus.name,
-    status: import_schema.visitStatus.status
-  }).from(import_schema.visitStatus);
-  const allVisitStatuss = await query;
-  (0, import_response.SuccessResponse)(res, { allVisitStatuss }, 200);
+    // بناء الاستعلام الأساسي لجلب حالات الزيارة
+    const query = db_1.db
+        .select({
+        id: schema_1.visitStatus.id,
+        name: schema_1.visitStatus.name,
+        status: schema_1.visitStatus.status,
+    })
+        .from(schema_1.visitStatus);
+    const allVisitStatuss = await query;
+    // إرسال الرد
+    (0, response_1.SuccessResponse)(res, { allVisitStatuss: allVisitStatuss }, 200);
 };
+exports.getAllVisitStatuss = getAllVisitStatuss;
+// ✅ Get VisitStatuss By ID
 const getVisitStatussById = async (req, res) => {
-  const validated = await VisitStatusIdSchema.parseAsync({ params: req.params });
-  const { id } = validated.params;
-  const VisitStatuss = await import_db.db.select({
-    id: import_schema.visitStatus.id,
-    name: import_schema.visitStatus.name,
-    status: import_schema.visitStatus.status
-  }).from(import_schema.visitStatus).where((0, import_drizzle_orm.eq)(import_schema.visitStatus.id, id)).limit(1);
-  if (!VisitStatuss[0]) {
-    throw new import_NotFound.NotFound("VisitStatuss not found");
-  }
-  (0, import_response.SuccessResponse)(res, { VisitStatuss: VisitStatuss[0] }, 200);
+    // التحقق من صحة الـ ID المبعوث في الـ Params
+    const validated = await exports.VisitStatusIdSchema.parseAsync({ params: req.params });
+    const { id } = validated.params;
+    const VisitStatuss = await db_1.db
+        .select({
+        id: schema_1.visitStatus.id,
+        name: schema_1.visitStatus.name,
+        status: schema_1.visitStatus.status,
+    })
+        .from(schema_1.visitStatus)
+        .where((0, drizzle_orm_1.eq)(schema_1.visitStatus.id, id))
+        .limit(1);
+    if (!VisitStatuss[0]) {
+        throw new NotFound_1.NotFound("VisitStatuss not found");
+    }
+    (0, response_1.SuccessResponse)(res, { VisitStatuss: VisitStatuss[0] }, 200);
 };
+exports.getVisitStatussById = getVisitStatussById;
+// ✅ Create VisitStatuss
 const createVisitStatuss = async (req, res) => {
-  const validated = await createVisitStatusSchema.parseAsync({ body: req.body });
-  const { status, name } = validated.body;
-  await import_db.db.insert(import_schema.visitStatus).values({
-    status,
-    name
-  });
-  (0, import_response.SuccessResponse)(res, { message: "VisitStatuss created successfully" }, 201);
+    // التحقق من صحة البيانات المرسلة في الـ Body
+    const validated = await exports.createVisitStatusSchema.parseAsync({ body: req.body });
+    const { status, name } = validated.body;
+    await db_1.db.insert(schema_1.visitStatus).values({
+        status,
+        name,
+    });
+    (0, response_1.SuccessResponse)(res, { message: "VisitStatuss created successfully" }, 201);
 };
+exports.createVisitStatuss = createVisitStatuss;
+// ✅ Update VisitStatuss
 const updateVisitStatuss = async (req, res) => {
-  const validated = await updateVisitStatusSchema.parseAsync({
-    params: req.params,
-    body: req.body
-  });
-  const { id } = validated.params;
-  const { status, name } = validated.body;
-  const existingVisitStatuss = await import_db.db.select().from(import_schema.visitStatus).where((0, import_drizzle_orm.eq)(import_schema.visitStatus.id, id)).limit(1);
-  if (!existingVisitStatuss[0]) {
-    throw new import_NotFound.NotFound("VisitStatuss not found");
-  }
-  const updateData = {};
-  if (status !== void 0) updateData.status = status;
-  if (name !== void 0) updateData.name = name;
-  await import_db.db.update(import_schema.visitStatus).set(updateData).where((0, import_drizzle_orm.eq)(import_schema.visitStatus.id, id));
-  (0, import_response.SuccessResponse)(res, { message: "VisitStatuss updated successfully" }, 200);
+    // التحقق من الـ ID والبيانات المرسلة للتعديل
+    const validated = await exports.updateVisitStatusSchema.parseAsync({
+        params: req.params,
+        body: req.body
+    });
+    const { id } = validated.params;
+    const { status, name } = validated.body;
+    // التأكد أولاً من أن الـ VisitStatus موجود بالفعل في قاعدة البيانات
+    const existingVisitStatuss = await db_1.db
+        .select()
+        .from(schema_1.visitStatus)
+        .where((0, drizzle_orm_1.eq)(schema_1.visitStatus.id, id))
+        .limit(1);
+    if (!existingVisitStatuss[0]) {
+        throw new NotFound_1.NotFound("VisitStatuss not found");
+    }
+    // بناء كائن التحديث ديناميكياً لتجنب إرسال قيم undefined للداتابيز
+    const updateData = {};
+    if (status !== undefined)
+        updateData.status = status;
+    if (name !== undefined)
+        updateData.name = name;
+    await db_1.db.update(schema_1.visitStatus).set(updateData).where((0, drizzle_orm_1.eq)(schema_1.visitStatus.id, id));
+    (0, response_1.SuccessResponse)(res, { message: "VisitStatuss updated successfully" }, 200);
 };
+exports.updateVisitStatuss = updateVisitStatuss;
+// ✅ Delete VisitStatuss
 const deleteVisitStatuss = async (req, res) => {
-  const validated = await VisitStatusIdSchema.parseAsync({ params: req.params });
-  const { id } = validated.params;
-  const existingVisitStatuss = await import_db.db.select().from(import_schema.visitStatus).where((0, import_drizzle_orm.eq)(import_schema.visitStatus.id, id)).limit(1);
-  if (!existingVisitStatuss[0]) {
-    throw new import_NotFound.NotFound("VisitStatuss not found");
-  }
-  await import_db.db.delete(import_schema.visitStatus).where((0, import_drizzle_orm.eq)(import_schema.visitStatus.id, id));
-  (0, import_response.SuccessResponse)(res, { message: "VisitStatuss deleted successfully" }, 200);
+    // التحقق من الـ ID المبعوث في الـ Params
+    const validated = await exports.VisitStatusIdSchema.parseAsync({ params: req.params });
+    const { id } = validated.params;
+    const existingVisitStatuss = await db_1.db
+        .select()
+        .from(schema_1.visitStatus)
+        .where((0, drizzle_orm_1.eq)(schema_1.visitStatus.id, id))
+        .limit(1);
+    if (!existingVisitStatuss[0]) {
+        throw new NotFound_1.NotFound("VisitStatuss not found");
+    }
+    await db_1.db.delete(schema_1.visitStatus).where((0, drizzle_orm_1.eq)(schema_1.visitStatus.id, id));
+    (0, response_1.SuccessResponse)(res, { message: "VisitStatuss deleted successfully" }, 200);
 };
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  VisitStatusIdSchema,
-  createVisitStatusSchema,
-  createVisitStatuss,
-  deleteVisitStatuss,
-  getAllVisitStatuss,
-  getVisitStatussById,
-  updateVisitStatusSchema,
-  updateVisitStatuss
-});
+exports.deleteVisitStatuss = deleteVisitStatuss;
