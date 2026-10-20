@@ -25,5 +25,4 @@ __exportStar(require("./superadmin/statusRequest"), exports);
 __exportStar(require("./superadmin/products"), exports);
 __exportStar(require("./superadmin/leads"), exports);
 __exportStar(require("./superadmin/salesProjectUsers"), exports);
-// Admin Models
-// src/models/schema/index.ts
+__exportStar(require("./superadmin/salesProjects"), exports);

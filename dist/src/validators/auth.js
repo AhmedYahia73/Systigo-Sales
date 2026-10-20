@@ -8,7 +8,8 @@ const zod_1 = __importDefault(require("zod"));
 exports.loginSchema = zod_1.default.object({
     body: zod_1.default.object({
         email: zod_1.default.string().email("Invalid email"),
-        password: zod_1.default.string().min(6, "Password must be at leas 6 characters long"),
+        password: zod_1.default.string().min(6, "Password must be at least 6 characters long"),
+        project_id: zod_1.default.string().optional(),
     }),
 });
 exports.hashPasswordSchema = zod_1.default.object({

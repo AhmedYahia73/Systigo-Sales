@@ -6,6 +6,8 @@ const catchAsync_1 = require("../../utils/catchAsync");
 const validation_1 = require("../../middlewares/validation");
 const auth_2 = require("../../validators/auth");
 const route = (0, express_1.Router)();
+route.get("/sales-projects", (0, catchAsync_1.catchAsync)(auth_1.getSalesProjects));
+route.get("/sales-projects/:id", (0, catchAsync_1.catchAsync)(auth_1.getProjectDetails));
 route.post("/login", (0, validation_1.validate)(auth_2.loginSchema), (0, catchAsync_1.catchAsync)(auth_1.login));
 route.post("/hash_password", (0, validation_1.validate)(auth_2.hashPasswordSchema), (0, catchAsync_1.catchAsync)(auth_1.hash_password));
 exports.default = route;
