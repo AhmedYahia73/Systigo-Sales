@@ -243,7 +243,7 @@ const deleteTargets = async (req, res) => {
         throw new NotFound_1.NotFound("Target not found");
     }
     // سيتم حذف target_items و target_sales أوتوماتيكياً بسبب onDelete: "cascade"
-    await db_1.db.delete(schema_1.targets).where((0, drizzle_orm_1.eq)(schema_1.targets.id, id));
+    await db_1.db.delete(schema_1.targets).where(req.user?.project_id ? (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.targets.id, id), (0, drizzle_orm_1.eq)(schema_1.targets.sales_project_id, req.user.project_id)) : (0, drizzle_orm_1.eq)(schema_1.targets.id, id));
     (0, response_1.SuccessResponse)(res, { message: "Target deleted successfully" }, 200);
 };
 exports.deleteTargets = deleteTargets;

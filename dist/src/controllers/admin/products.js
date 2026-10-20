@@ -45,7 +45,11 @@ exports.ProductIdSchema = zod_1.z.object({
 // ==========================================
 // ✅ Get All Products
 const getAllProducts = async (req, res) => {
-    const allProducts = await db_1.db.select().from(schema_1.products).orderBy((0, drizzle_orm_1.desc)(schema_1.products.createdAt));
+    let query = db_1.db.select().from(schema_1.products).$dynamic();
+    if (req.user?.project_id) {
+        query = query.where((0, drizzle_orm_1.eq)(schema_1.products.sales_project_id, req.user.project_id));
+    }
+    const allProducts = await query.orderBy((0, drizzle_orm_1.desc)(schema_1.products.createdAt));
     (0, response_1.SuccessResponse)(res, { allProducts }, 200);
 };
 exports.getAllProducts = getAllProducts;
@@ -53,10 +57,14 @@ exports.getAllProducts = getAllProducts;
 const getProductById = async (req, res) => {
     const validated = await exports.ProductIdSchema.parseAsync({ params: req.params });
     const { id } = validated.params;
+    const whereConditions = [(0, drizzle_orm_1.eq)(schema_1.products.id, id)];
+    if (req.user?.project_id) {
+        whereConditions.push((0, drizzle_orm_1.eq)(schema_1.products.sales_project_id, req.user.project_id));
+    }
     const productRaw = await db_1.db
         .select()
         .from(schema_1.products)
-        .where((0, drizzle_orm_1.eq)(schema_1.products.id, id))
+        .where((0, drizzle_orm_1.and)(...whereConditions))
         .limit(1);
     if (!productRaw[0]) {
         throw new NotFound_1.NotFound("Product not found");
@@ -74,6 +82,7 @@ const createProduct = async (req, res) => {
         description: description || null,
         demo_link: demo_link || null,
         points,
+        sales_project_id: req.user?.project_id,
     });
     (0, response_1.SuccessResponse)(res, { message: "Product created successfully" }, 201);
 };
@@ -86,10 +95,14 @@ const updateProduct = async (req, res) => {
     });
     const { id } = validated.params;
     const { name, feez, description, demo_link, points } = validated.body;
+    const whereConditions = [(0, drizzle_orm_1.eq)(schema_1.products.id, id)];
+    if (req.user?.project_id) {
+        whereConditions.push((0, drizzle_orm_1.eq)(schema_1.products.sales_project_id, req.user.project_id));
+    }
     const existingProduct = await db_1.db
         .select()
         .from(schema_1.products)
-        .where((0, drizzle_orm_1.eq)(schema_1.products.id, id))
+        .where((0, drizzle_orm_1.and)(...whereConditions))
         .limit(1);
     if (!existingProduct[0]) {
         throw new NotFound_1.NotFound("Product not found");
@@ -106,7 +119,7 @@ const updateProduct = async (req, res) => {
     if (points !== undefined)
         updateData.points = points;
     if (Object.keys(updateData).length > 0) {
-        await db_1.db.update(schema_1.products).set(updateData).where((0, drizzle_orm_1.eq)(schema_1.products.id, id));
+        await db_1.db.update(schema_1.products).set(updateData).where((0, drizzle_orm_1.and)(...whereConditions));
     }
     (0, response_1.SuccessResponse)(res, { message: "Product updated successfully" }, 200);
 };
@@ -115,15 +128,19 @@ exports.updateProduct = updateProduct;
 const deleteProduct = async (req, res) => {
     const validated = await exports.ProductIdSchema.parseAsync({ params: req.params });
     const { id } = validated.params;
+    const whereConditions = [(0, drizzle_orm_1.eq)(schema_1.products.id, id)];
+    if (req.user?.project_id) {
+        whereConditions.push((0, drizzle_orm_1.eq)(schema_1.products.sales_project_id, req.user.project_id));
+    }
     const existingProduct = await db_1.db
         .select()
         .from(schema_1.products)
-        .where((0, drizzle_orm_1.eq)(schema_1.products.id, id))
+        .where((0, drizzle_orm_1.and)(...whereConditions))
         .limit(1);
     if (!existingProduct[0]) {
         throw new NotFound_1.NotFound("Product not found");
     }
-    await db_1.db.delete(schema_1.products).where((0, drizzle_orm_1.eq)(schema_1.products.id, id));
+    await db_1.db.delete(schema_1.products).where((0, drizzle_orm_1.and)(...whereConditions));
     (0, response_1.SuccessResponse)(res, { message: "Product deleted successfully" }, 200);
 };
 exports.deleteProduct = deleteProduct;

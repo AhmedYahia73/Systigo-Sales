@@ -11,7 +11,6 @@ const zod_1 = require("zod");
 // ==========================================
 // 🛡️ Zod Validation Schemas
 // ==========================================
-// الـ Schema الخاص بإنشاء هدف جديد
 exports.createVisitStatusSchema = zod_1.z.object({
     body: zod_1.z.object({
         name: zod_1.z.string({
@@ -23,20 +22,18 @@ exports.createVisitStatusSchema = zod_1.z.object({
         }),
     }),
 });
-// الـ Schema الخاص بتحديث هدف (البيانات اختيارية ولكن إذا أُرسلت يجب أن تكون صالحة)
 exports.updateVisitStatusSchema = zod_1.z.object({
     params: zod_1.z.object({
-        id: zod_1.z.string({ required_error: "ID is required in parameters" }), // غيرها لـ z.coerce.number() لو الـ ID رقم في الداتابيز
+        id: zod_1.z.string({ required_error: "ID is required in parameters" }),
     }),
     body: zod_1.z.object({
         name: zod_1.z.string().min(1, "Name cannot be empty").optional(),
         status: zod_1.z.boolean({ invalid_type_error: "Status must be a boolean" }).optional(),
     }),
 });
-// الـ Schema الخاص بالعمليات التي تتطلب ID فقط (مثل جلب عنصر محدد أو حذفه)
 exports.VisitStatusIdSchema = zod_1.z.object({
     params: zod_1.z.object({
-        id: zod_1.z.string({ required_error: "ID is required in parameters" }), // غيرها لـ z.coerce.number() لو الـ ID رقم
+        id: zod_1.z.string({ required_error: "ID is required in parameters" }),
     }),
 });
 // ==========================================
@@ -44,24 +41,29 @@ exports.VisitStatusIdSchema = zod_1.z.object({
 // ==========================================
 // ✅ Get All VisitStatuss
 const getAllVisitStatuss = async (req, res) => {
-    // بناء الاستعلام الأساسي لجلب حالات الزيارة
-    const query = db_1.db
+    let query = db_1.db
         .select({
         id: schema_1.visitStatus.id,
         name: schema_1.visitStatus.name,
         status: schema_1.visitStatus.status,
     })
-        .from(schema_1.visitStatus);
+        .from(schema_1.visitStatus)
+        .$dynamic();
+    if (req.user?.project_id) {
+        query = query.where((0, drizzle_orm_1.eq)(schema_1.visitStatus.sales_project_id, req.user.project_id));
+    }
     const allVisitStatuss = await query;
-    // إرسال الرد
     (0, response_1.SuccessResponse)(res, { allVisitStatuss: allVisitStatuss }, 200);
 };
 exports.getAllVisitStatuss = getAllVisitStatuss;
 // ✅ Get VisitStatuss By ID
 const getVisitStatussById = async (req, res) => {
-    // التحقق من صحة الـ ID المبعوث في الـ Params
     const validated = await exports.VisitStatusIdSchema.parseAsync({ params: req.params });
     const { id } = validated.params;
+    const whereConditions = [(0, drizzle_orm_1.eq)(schema_1.visitStatus.id, id)];
+    if (req.user?.project_id) {
+        whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visitStatus.sales_project_id, req.user.project_id));
+    }
     const VisitStatuss = await db_1.db
         .select({
         id: schema_1.visitStatus.id,
@@ -69,7 +71,7 @@ const getVisitStatussById = async (req, res) => {
         status: schema_1.visitStatus.status,
     })
         .from(schema_1.visitStatus)
-        .where((0, drizzle_orm_1.eq)(schema_1.visitStatus.id, id))
+        .where((0, drizzle_orm_1.and)(...whereConditions))
         .limit(1);
     if (!VisitStatuss[0]) {
         throw new NotFound_1.NotFound("VisitStatuss not found");
@@ -79,58 +81,62 @@ const getVisitStatussById = async (req, res) => {
 exports.getVisitStatussById = getVisitStatussById;
 // ✅ Create VisitStatuss
 const createVisitStatuss = async (req, res) => {
-    // التحقق من صحة البيانات المرسلة في الـ Body
     const validated = await exports.createVisitStatusSchema.parseAsync({ body: req.body });
     const { status, name } = validated.body;
     await db_1.db.insert(schema_1.visitStatus).values({
         status,
         name,
+        sales_project_id: req.user?.project_id,
     });
     (0, response_1.SuccessResponse)(res, { message: "VisitStatuss created successfully" }, 201);
 };
 exports.createVisitStatuss = createVisitStatuss;
 // ✅ Update VisitStatuss
 const updateVisitStatuss = async (req, res) => {
-    // التحقق من الـ ID والبيانات المرسلة للتعديل
     const validated = await exports.updateVisitStatusSchema.parseAsync({
         params: req.params,
         body: req.body
     });
     const { id } = validated.params;
     const { status, name } = validated.body;
-    // التأكد أولاً من أن الـ VisitStatus موجود بالفعل في قاعدة البيانات
+    const whereConditions = [(0, drizzle_orm_1.eq)(schema_1.visitStatus.id, id)];
+    if (req.user?.project_id) {
+        whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visitStatus.sales_project_id, req.user.project_id));
+    }
     const existingVisitStatuss = await db_1.db
         .select()
         .from(schema_1.visitStatus)
-        .where((0, drizzle_orm_1.eq)(schema_1.visitStatus.id, id))
+        .where((0, drizzle_orm_1.and)(...whereConditions))
         .limit(1);
     if (!existingVisitStatuss[0]) {
         throw new NotFound_1.NotFound("VisitStatuss not found");
     }
-    // بناء كائن التحديث ديناميكياً لتجنب إرسال قيم undefined للداتابيز
     const updateData = {};
     if (status !== undefined)
         updateData.status = status;
     if (name !== undefined)
         updateData.name = name;
-    await db_1.db.update(schema_1.visitStatus).set(updateData).where((0, drizzle_orm_1.eq)(schema_1.visitStatus.id, id));
+    await db_1.db.update(schema_1.visitStatus).set(updateData).where((0, drizzle_orm_1.and)(...whereConditions));
     (0, response_1.SuccessResponse)(res, { message: "VisitStatuss updated successfully" }, 200);
 };
 exports.updateVisitStatuss = updateVisitStatuss;
 // ✅ Delete VisitStatuss
 const deleteVisitStatuss = async (req, res) => {
-    // التحقق من الـ ID المبعوث في الـ Params
     const validated = await exports.VisitStatusIdSchema.parseAsync({ params: req.params });
     const { id } = validated.params;
+    const whereConditions = [(0, drizzle_orm_1.eq)(schema_1.visitStatus.id, id)];
+    if (req.user?.project_id) {
+        whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visitStatus.sales_project_id, req.user.project_id));
+    }
     const existingVisitStatuss = await db_1.db
         .select()
         .from(schema_1.visitStatus)
-        .where((0, drizzle_orm_1.eq)(schema_1.visitStatus.id, id))
+        .where((0, drizzle_orm_1.and)(...whereConditions))
         .limit(1);
     if (!existingVisitStatuss[0]) {
         throw new NotFound_1.NotFound("VisitStatuss not found");
     }
-    await db_1.db.delete(schema_1.visitStatus).where((0, drizzle_orm_1.eq)(schema_1.visitStatus.id, id));
+    await db_1.db.delete(schema_1.visitStatus).where((0, drizzle_orm_1.and)(...whereConditions));
     (0, response_1.SuccessResponse)(res, { message: "VisitStatuss deleted successfully" }, 200);
 };
 exports.deleteVisitStatuss = deleteVisitStatuss;

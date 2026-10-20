@@ -7,6 +7,7 @@ const drizzle_orm_1 = require("drizzle-orm");
 const visitStatus_1 = require("./visitStatus");
 exports.visits = (0, mysql_core_1.mysqlTable)("visits", {
     id: (0, mysql_core_1.char)("id", { length: 36 }).primaryKey().default((0, drizzle_orm_1.sql) `(UUID())`),
+    sales_project_id: (0, mysql_core_1.char)("sales_project_id", { length: 36 }),
     lat: (0, mysql_core_1.double)("lat").notNull(),
     lng: (0, mysql_core_1.double)("lng").notNull(),
     name: (0, mysql_core_1.varchar)("name", { length: 255 }).notNull(),

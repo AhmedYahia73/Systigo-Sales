@@ -7,6 +7,7 @@ const drizzle_orm_1 = require("drizzle-orm");
 const visits_1 = require("./visits");
 exports.statusRequest = (0, mysql_core_1.mysqlTable)("status_requests", {
     id: (0, mysql_core_1.char)("id", { length: 36 }).primaryKey().default((0, drizzle_orm_1.sql) `(UUID())`),
+    sales_project_id: (0, mysql_core_1.char)("sales_project_id", { length: 36 }),
     visitId: (0, mysql_core_1.char)("visit_id", { length: 36 })
         .notNull()
         .references(() => visits_1.visits.id, { onDelete: "cascade" }),

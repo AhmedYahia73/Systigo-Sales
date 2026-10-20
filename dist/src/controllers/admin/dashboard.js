@@ -60,6 +60,9 @@ const viewDashboard = async (req, res) => {
     const sales_ids = salesList.map((item) => item.id);
     // 2. بناء شروط الـ Join / Filtering
     const joinConditions = [(0, drizzle_orm_1.eq)(schema_1.visits.status_id, schema_1.visitStatus.id)];
+    if (req.user?.project_id) {
+        joinConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_project_id, req.user.project_id));
+    }
     if (role === "sales") {
         joinConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, userId));
     }
@@ -89,6 +92,9 @@ const viewDashboard = async (req, res) => {
         .groupBy(schema_1.visitStatus.id, schema_1.visitStatus.name);
     // 4. إعداد شروط الاستعلام العام للزيارات
     const visitsWhereConditions = [];
+    if (req.user?.project_id) {
+        visitsWhereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_project_id, req.user.project_id));
+    }
     if (role === "sales") {
         visitsWhereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_id, userId));
     }
@@ -123,6 +129,9 @@ const viewDashboard = async (req, res) => {
     // 5. حساب التارجت المخصص بناءً على المستخدم والتواريخ
     // 5. حساب التارجت المخصص بناءً على المستخدم والتواريخ
     const targetWhereConditions = [];
+    if (req.user?.project_id) {
+        targetWhereConditions.push((0, drizzle_orm_1.eq)(schema_1.targets.sales_project_id, req.user.project_id));
+    }
     if (role === "sales") {
         targetWhereConditions.push((0, drizzle_orm_1.eq)(schema_1.target_sales.user_id, userId));
     }

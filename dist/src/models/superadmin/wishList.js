@@ -1,10 +1,12 @@
 "use strict";
+// src/models/superadmin/wishList.ts
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.wishList = void 0;
 const mysql_core_1 = require("drizzle-orm/mysql-core");
 const drizzle_orm_1 = require("drizzle-orm");
 exports.wishList = (0, mysql_core_1.mysqlTable)("wishList", {
     id: (0, mysql_core_1.char)("id", { length: 36 }).primaryKey().default((0, drizzle_orm_1.sql) `(UUID())`),
+    sales_project_id: (0, mysql_core_1.char)("sales_project_id", { length: 36 }),
     name: (0, mysql_core_1.varchar)("name", { length: 100 }).notNull(),
     description: (0, mysql_core_1.varchar)("description", { length: 1000 }),
     // References Parent DB (Taskito) users.id via cross-database queries

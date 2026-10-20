@@ -40,13 +40,14 @@ const getPendingRequest = async (req, res) => {
     const search = (req.query.search || '').trim();
     const offset = (page - 1) * limit;
     const baseCondition = (0, drizzle_orm_1.eq)(schema_1.statusRequest.status, 'pending');
+    const projectCondition = req.user?.project_id ? (0, drizzle_orm_1.eq)(schema_1.statusRequest.sales_project_id, req.user.project_id) : undefined;
     const leaderCondition = req.user?.role === "leader"
         ? (0, drizzle_orm_1.eq)(schema_1.users.leader_id, req.user?.id)
         : undefined;
     const searchCondition = search
         ? (0, drizzle_orm_1.or)((0, drizzle_orm_1.like)(schema_1.users.name, `%${search}%`), (0, drizzle_orm_1.like)(schema_1.users.phone, `%${search}%`), (0, drizzle_orm_1.like)(schema_1.visits.name, `%${search}%`))
         : undefined;
-    const whereClause = (0, drizzle_orm_1.and)(baseCondition, leaderCondition, searchCondition);
+    const whereClause = (0, drizzle_orm_1.and)(baseCondition, leaderCondition, searchCondition, projectCondition);
     const pendingRequests = await db_1.db
         .select({
         id: schema_1.statusRequest.id,
@@ -93,13 +94,14 @@ const getHistoryRequest = async (req, res) => {
     const search = (req.query.search || '').trim();
     const offset = (page - 1) * limit;
     const baseCondition = (0, drizzle_orm_1.ne)(schema_1.statusRequest.status, 'pending');
+    const projectCondition = req.user?.project_id ? (0, drizzle_orm_1.eq)(schema_1.statusRequest.sales_project_id, req.user.project_id) : undefined;
     const leaderCondition = req.user?.role === "leader"
         ? (0, drizzle_orm_1.eq)(schema_1.users.leader_id, req.user?.id)
         : undefined;
     const searchCondition = search
         ? (0, drizzle_orm_1.or)((0, drizzle_orm_1.like)(schema_1.users.name, `%${search}%`), (0, drizzle_orm_1.like)(schema_1.users.phone, `%${search}%`), (0, drizzle_orm_1.like)(schema_1.visits.name, `%${search}%`))
         : undefined;
-    const whereClause = (0, drizzle_orm_1.and)(baseCondition, leaderCondition, searchCondition);
+    const whereClause = (0, drizzle_orm_1.and)(baseCondition, leaderCondition, searchCondition, projectCondition);
     const historyRequests = await db_1.db
         .select({
         id: schema_1.statusRequest.id,

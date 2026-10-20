@@ -353,7 +353,7 @@ const updateLead = async (req, res) => {
         notes: notes !== undefined ? notes : existingLead.notes,
         products: validatedProducts !== undefined ? validatedProducts : existingLead.products,
     };
-    await db_1.db.update(schema_1.leads).set(updateData).where((0, drizzle_orm_1.eq)(schema_1.leads.id, id));
+    await db_1.db.update(schema_1.leads).set(updateData).where(req.user?.project_id ? (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.leads.id, id), (0, drizzle_orm_1.eq)(schema_1.leads.sales_project_id, req.user.project_id)) : (0, drizzle_orm_1.eq)(schema_1.leads.id, id));
     (0, response_1.SuccessResponse)(res, { message: "Lead updated successfully" }, 200);
 };
 exports.updateLead = updateLead;
@@ -383,7 +383,7 @@ const deleteLead = async (req, res) => {
     if (role === "sales" && existingLead.sales_id !== userId) {
         throw new Errors_1.NotFound("Lead not found or unauthorized");
     }
-    await db_1.db.delete(schema_1.leads).where((0, drizzle_orm_1.eq)(schema_1.leads.id, id));
+    await db_1.db.delete(schema_1.leads).where(req.user?.project_id ? (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.leads.id, id), (0, drizzle_orm_1.eq)(schema_1.leads.sales_project_id, req.user.project_id)) : (0, drizzle_orm_1.eq)(schema_1.leads.id, id));
     (0, response_1.SuccessResponse)(res, { message: "Lead deleted successfully" }, 200);
 };
 exports.deleteLead = deleteLead;
@@ -444,7 +444,7 @@ const convertLeadToVisit = async (req, res) => {
             status: "visit",
             products: leadProducts,
         });
-        await tx.delete(schema_1.leads).where((0, drizzle_orm_1.eq)(schema_1.leads.id, id));
+        await tx.delete(schema_1.leads).where(req.user?.project_id ? (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.leads.id, id), (0, drizzle_orm_1.eq)(schema_1.leads.sales_project_id, req.user.project_id)) : (0, drizzle_orm_1.eq)(schema_1.leads.id, id));
     });
     (0, response_1.SuccessResponse)(res, { message: "Lead converted to visit successfully" }, 200);
 };

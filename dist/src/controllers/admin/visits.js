@@ -196,7 +196,13 @@ const getAllVisits = async (req, res) => {
     const toDateStr = req.query.to;
     const offset = (page - 1) * limit;
     let whereConditions = [];
+    if (req.user?.project_id) {
+        whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_project_id, req.user.project_id));
+    }
     whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.status, "visit"));
+    if (req.user?.project_id) {
+        whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.sales_project_id, req.user.project_id));
+    }
     if (queryStatusId) {
         whereConditions.push((0, drizzle_orm_1.eq)(schema_1.visits.status_id, queryStatusId));
     }
@@ -610,7 +616,7 @@ const getVisitsById = async (req, res) => {
         products: schema_1.visits.products,
     })
         .from(schema_1.visits)
-        .where((0, drizzle_orm_1.eq)(schema_1.visits.id, id))
+        .where(req.user?.project_id ? (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.visits.id, id), (0, drizzle_orm_1.eq)(schema_1.visits.sales_project_id, req.user.project_id)) : (0, drizzle_orm_1.eq)(schema_1.visits.id, id))
         .limit(1);
     if (!visitRaw[0]) {
         throw new NotFound_1.NotFound("Visit not found");
@@ -689,6 +695,7 @@ const createVisits = async (req, res) => {
         sales_id,
         products: visitProducts,
         points: 0,
+        sales_project_id: req.user?.project_id,
     };
     if ((status === "sales" || status === "delivered") && visitProducts.length > 0 && (req.user?.role === "leader" || req.user?.role === "admin")) {
         insertData.points = await (0, exports.calculatePointsForProducts)(visitProducts);
@@ -708,7 +715,7 @@ const updateVisits = async (req, res) => {
     const existingVisit = await db_1.db
         .select()
         .from(schema_1.visits)
-        .where((0, drizzle_orm_1.eq)(schema_1.visits.id, id))
+        .where(req.user?.project_id ? (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.visits.id, id), (0, drizzle_orm_1.eq)(schema_1.visits.sales_project_id, req.user.project_id)) : (0, drizzle_orm_1.eq)(schema_1.visits.id, id))
         .limit(1);
     const currentVisit = existingVisit[0];
     if (!currentVisit) {
@@ -823,7 +830,7 @@ const deleteVisits = async (req, res) => {
     const existingVisit = await db_1.db
         .select()
         .from(schema_1.visits)
-        .where((0, drizzle_orm_1.eq)(schema_1.visits.id, id))
+        .where(req.user?.project_id ? (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.visits.id, id), (0, drizzle_orm_1.eq)(schema_1.visits.sales_project_id, req.user.project_id)) : (0, drizzle_orm_1.eq)(schema_1.visits.id, id))
         .limit(1);
     if (!existingVisit[0]) {
         throw new NotFound_1.NotFound("Visit not found");
