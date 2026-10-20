@@ -295,7 +295,7 @@ export const deleteTargets = async (req: Request, res: Response) => {
   }
 
   // سيتم حذف target_items و target_sales أوتوماتيكياً بسبب onDelete: "cascade"
-  await db.delete(targets).where(eq(targets.id, id));
+  await db.delete(targets).where(req.user?.project_id ? and(eq(targets.id, id), eq(targets.sales_project_id, req.user.project_id)) : eq(targets.id, id));
 
   SuccessResponse(res, { message: "Target deleted successfully" }, 200);
 };

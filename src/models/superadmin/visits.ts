@@ -15,6 +15,7 @@ import { visitStatus } from "./visitStatus";
 
 export const visits = mysqlTable("visits", {
   id: char("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  sales_project_id: char("sales_project_id", { length: 36 }),
   lat: double("lat").notNull(),
   lng: double("lng").notNull(),
 

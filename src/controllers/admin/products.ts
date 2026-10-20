@@ -4,7 +4,7 @@ import { products } from "../../models/schema";
 import { SuccessResponse } from "../../utils/response";
 import { NotFound } from "../../Errors/NotFound";
 import { z } from "zod";
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 
 // ==========================================
 // 🛡️ Zod Validation Schemas
@@ -50,7 +50,11 @@ export const ProductIdSchema = z.object({
 
 // ✅ Get All Products
 export const getAllProducts = async (req: Request, res: Response) => {
-  const allProducts = await db.select().from(products).orderBy(desc(products.createdAt));
+  let query = db.select().from(products).$dynamic();
+  if (req.user?.project_id) {
+    query = query.where(eq(products.sales_project_id, req.user.project_id));
+  }
+  const allProducts = await query.orderBy(desc(products.createdAt));
   SuccessResponse(res, { allProducts }, 200);
 };
 
@@ -59,10 +63,15 @@ export const getProductById = async (req: Request, res: Response) => {
   const validated = await ProductIdSchema.parseAsync({ params: req.params });
   const { id } = validated.params;
 
+  const whereConditions = [eq(products.id, id)];
+  if (req.user?.project_id) {
+    whereConditions.push(eq(products.sales_project_id, req.user.project_id));
+  }
+
   const productRaw = await db
     .select()
     .from(products)
-    .where(eq(products.id, id))
+    .where(and(...whereConditions))
     .limit(1);
 
   if (!productRaw[0]) {
@@ -83,6 +92,7 @@ export const createProduct = async (req: Request, res: Response) => {
     description: description || null,
     demo_link: demo_link || null,
     points,
+    sales_project_id: req.user?.project_id,
   });
 
   SuccessResponse(res, { message: "Product created successfully" }, 201);
@@ -97,10 +107,15 @@ export const updateProduct = async (req: Request, res: Response) => {
   const { id } = validated.params;
   const { name, feez, description, demo_link, points } = validated.body;
 
+  const whereConditions = [eq(products.id, id)];
+  if (req.user?.project_id) {
+    whereConditions.push(eq(products.sales_project_id, req.user.project_id));
+  }
+
   const existingProduct = await db
     .select()
     .from(products)
-    .where(eq(products.id, id))
+    .where(and(...whereConditions))
     .limit(1);
 
   if (!existingProduct[0]) {
@@ -115,7 +130,7 @@ export const updateProduct = async (req: Request, res: Response) => {
   if (points !== undefined) updateData.points = points;
 
   if (Object.keys(updateData).length > 0) {
-    await db.update(products).set(updateData).where(eq(products.id, id));
+    await db.update(products).set(updateData).where(and(...whereConditions));
   }
 
   SuccessResponse(res, { message: "Product updated successfully" }, 200);
@@ -126,17 +141,22 @@ export const deleteProduct = async (req: Request, res: Response) => {
   const validated = await ProductIdSchema.parseAsync({ params: req.params });
   const { id } = validated.params;
 
+  const whereConditions = [eq(products.id, id)];
+  if (req.user?.project_id) {
+    whereConditions.push(eq(products.sales_project_id, req.user.project_id));
+  }
+
   const existingProduct = await db
     .select()
     .from(products)
-    .where(eq(products.id, id))
+    .where(and(...whereConditions))
     .limit(1);
 
   if (!existingProduct[0]) {
     throw new NotFound("Product not found");
   }
 
-  await db.delete(products).where(eq(products.id, id));
+  await db.delete(products).where(and(...whereConditions));
 
   SuccessResponse(res, { message: "Product deleted successfully" }, 200);
 };

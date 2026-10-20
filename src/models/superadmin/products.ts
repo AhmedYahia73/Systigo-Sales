@@ -1,4 +1,4 @@
-// src/models/schema/visits.ts
+// src/models/schema/products.ts
 
 import {
   mysqlTable,
@@ -9,11 +9,10 @@ import {
   double,
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
-import { visitStatus } from "./visitStatus";
-import { users } from "./users";
 
 export const products = mysqlTable("products", {
   id: char("id", { length: 36 }).primaryKey().default(sql`(UUID())`), 
+  sales_project_id: char("sales_project_id", { length: 36 }),
   name: varchar("name", { length: 255 }).notNull(),
   feez: double("feez").default(0),
   description: varchar("description", { length: 1000 }),

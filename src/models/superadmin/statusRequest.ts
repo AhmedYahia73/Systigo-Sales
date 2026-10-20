@@ -11,6 +11,7 @@ import { visits } from './visits';
 
 export const statusRequest = mysqlTable("status_requests", {
   id: char("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  sales_project_id: char("sales_project_id", { length: 36 }),
   visitId: char("visit_id", { length: 36 })
     .notNull()
     .references(() => visits.id, { onDelete: "cascade" }),

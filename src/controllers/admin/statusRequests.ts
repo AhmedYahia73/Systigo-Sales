@@ -45,6 +45,7 @@ export const getPendingRequest = async (req: Request, res: Response) => {
     const offset = (page - 1) * limit;
 
     const baseCondition = eq(statusRequest.status, 'pending');
+    const projectCondition = req.user?.project_id ? eq(statusRequest.sales_project_id, req.user.project_id) : undefined;
 
     const leaderCondition = req.user?.role === "leader" 
         ? eq(users.leader_id, req.user?.id) 
@@ -58,7 +59,7 @@ export const getPendingRequest = async (req: Request, res: Response) => {
           )
         : undefined;
 
-    const whereClause = and(baseCondition, leaderCondition, searchCondition);
+    const whereClause = and(baseCondition, leaderCondition, searchCondition, projectCondition);
 
     const pendingRequests = await db
         .select({
@@ -111,6 +112,7 @@ export const getHistoryRequest = async (req: Request, res: Response) => {
     const offset = (page - 1) * limit;
 
     const baseCondition = ne(statusRequest.status, 'pending');
+    const projectCondition = req.user?.project_id ? eq(statusRequest.sales_project_id, req.user.project_id) : undefined;
 
     const leaderCondition = req.user?.role === "leader" 
         ? eq(users.leader_id, req.user?.id) 
@@ -124,7 +126,7 @@ export const getHistoryRequest = async (req: Request, res: Response) => {
           )
         : undefined;
 
-    const whereClause = and(baseCondition, leaderCondition, searchCondition);
+    const whereClause = and(baseCondition, leaderCondition, searchCondition, projectCondition);
 
     const historyRequests = await db
         .select({

@@ -435,7 +435,7 @@ export const updateLead = async (req: Request, res: Response) => {
       validatedProducts !== undefined ? validatedProducts : existingLead.products,
   };
 
-  await db.update(leads).set(updateData).where(eq(leads.id, id));
+  await db.update(leads).set(updateData).where(req.user?.project_id ? and(eq(leads.id, id), eq(leads.sales_project_id, req.user.project_id)) : eq(leads.id, id));
 
   SuccessResponse(res, { message: "Lead updated successfully" }, 200);
 };
@@ -472,7 +472,7 @@ export const deleteLead = async (req: Request, res: Response) => {
     throw new NotFound("Lead not found or unauthorized");
   }
 
-  await db.delete(leads).where(eq(leads.id, id));
+  await db.delete(leads).where(req.user?.project_id ? and(eq(leads.id, id), eq(leads.sales_project_id, req.user.project_id)) : eq(leads.id, id));
 
   SuccessResponse(res, { message: "Lead deleted successfully" }, 200);
 };
@@ -546,7 +546,7 @@ export const convertLeadToVisit = async (req: Request, res: Response) => {
       products: leadProducts,
     });
 
-    await tx.delete(leads).where(eq(leads.id, id));
+    await tx.delete(leads).where(req.user?.project_id ? and(eq(leads.id, id), eq(leads.sales_project_id, req.user.project_id)) : eq(leads.id, id));
   });
 
   SuccessResponse(

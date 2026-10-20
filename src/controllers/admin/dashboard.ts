@@ -80,6 +80,9 @@ export const viewDashboard = async (req: Request, res: Response) => {
 
     // 2. بناء شروط الـ Join / Filtering
     const joinConditions = [eq(visits.status_id, visitStatus.id)];
+    if (req.user?.project_id) {
+        joinConditions.push(eq(visits.sales_project_id, req.user.project_id));
+    }
 
     if (role === "sales") {
     joinConditions.push(eq(visits.sales_id, userId));
@@ -110,6 +113,9 @@ export const viewDashboard = async (req: Request, res: Response) => {
 
     // 4. إعداد شروط الاستعلام العام للزيارات
     const visitsWhereConditions = [];
+    if (req.user?.project_id) {
+        visitsWhereConditions.push(eq(visits.sales_project_id, req.user.project_id));
+    }
     if (role === "sales") {
         visitsWhereConditions.push(eq(visits.sales_id, userId));
     } 
@@ -147,6 +153,9 @@ export const viewDashboard = async (req: Request, res: Response) => {
     // 5. حساب التارجت المخصص بناءً على المستخدم والتواريخ
     // 5. حساب التارجت المخصص بناءً على المستخدم والتواريخ
     const targetWhereConditions: SQL[] = [];
+    if (req.user?.project_id) {
+        targetWhereConditions.push(eq(targets.sales_project_id, req.user.project_id));
+    }
     if (role === "sales") {
         targetWhereConditions.push(eq(target_sales.user_id, userId));
     } else if (role === "leader") {

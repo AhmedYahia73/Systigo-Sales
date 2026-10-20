@@ -225,8 +225,14 @@ export const getAllVisits = async (req: Request, res: Response) => {
     const offset = (page - 1) * limit;
 
     let whereConditions: SQL[] = [];
+    if (req.user?.project_id) {
+        whereConditions.push(eq(visits.sales_project_id, req.user.project_id));
+    }
 
     whereConditions.push(eq(visits.status, "visit"));
+    if (req.user?.project_id) {
+        whereConditions.push(eq(visits.sales_project_id, req.user.project_id));
+    }
     
     if (queryStatusId) {
         whereConditions.push(eq(visits.status_id, queryStatusId));
@@ -729,7 +735,7 @@ export const getVisitsById = async (req: Request, res: Response) => {
             products: visits.products,
         })
         .from(visits) 
-        .where(eq(visits.id, id))
+        .where(req.user?.project_id ? and(eq(visits.id, id), eq(visits.sales_project_id, req.user.project_id)) : eq(visits.id, id))
         .limit(1);
 
     if (!visitRaw[0]) {
@@ -825,6 +831,7 @@ export const createVisits = async (req: Request, res: Response) => {
         sales_id,
         products: visitProducts,
         points: 0,
+        sales_project_id: req.user?.project_id,
     };
     
     if ((status === "sales" || status === "delivered") && visitProducts.length > 0 && (req.user?.role === "leader" || req.user?.role === "admin")) {
@@ -848,7 +855,7 @@ export const updateVisits = async (req: Request, res: Response) => {
     const existingVisit = await db
         .select()
         .from(visits)
-        .where(eq(visits.id, id))
+        .where(req.user?.project_id ? and(eq(visits.id, id), eq(visits.sales_project_id, req.user.project_id)) : eq(visits.id, id))
         .limit(1);
 
     const currentVisit = existingVisit[0];
@@ -977,7 +984,7 @@ export const deleteVisits = async (req: Request, res: Response) => {
     const existingVisit = await db
         .select()
         .from(visits)
-        .where(eq(visits.id, id))
+        .where(req.user?.project_id ? and(eq(visits.id, id), eq(visits.sales_project_id, req.user.project_id)) : eq(visits.id, id))
         .limit(1);
 
     if (!existingVisit[0]) {

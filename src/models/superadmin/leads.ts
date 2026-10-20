@@ -10,6 +10,7 @@ import { sql } from "drizzle-orm";
 
 export const leads = mysqlTable("leads", {
   id: char("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  sales_project_id: char("sales_project_id", { length: 36 }),
   name: varchar("name", { length: 255 }).notNull(),
   phone: varchar("phone", { length: 20 }).notNull(),
   // References Parent DB (Taskito) users.id via cross-database queries

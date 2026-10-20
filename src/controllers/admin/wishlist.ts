@@ -145,6 +145,9 @@ export const getAllWishLists = async (req: Request, res: Response) => {
     const offset = (page - 1) * limit;
 
     let whereConditions: SQL[] = [];
+    if (req.user?.project_id) {
+        whereConditions.push(eq(wishList.sales_project_id, req.user.project_id));
+    }
 
     // 1. الفلترة حسب الدور أو sales_id المرسل في الـ Query
     if (userRole === "admin") {
@@ -250,7 +253,7 @@ export const getWishListsById = async (req: Request, res: Response) => {
         })
         .from(wishList)
         .leftJoin(users, eq(wishList.sales_id, users.id))
-        .where(eq(wishList.id, id))
+        .where(req.user?.project_id ? and(eq(wishList.id, id), eq(wishList.sales_project_id, req.user.project_id)) : eq(wishList.id, id))
         .limit(1);
 
     if (!WishLists[0]) {
@@ -333,7 +336,7 @@ export const updateWishLists = async (req: Request, res: Response) => {
     if (description !== undefined) updateData.description = description;
     if (sales_id !== undefined) updateData.sales_id = sales_id;
 
-    await db.update(wishList).set(updateData).where(eq(wishList.id, id));
+    await db.update(wishList).set(updateData).where(req.user?.project_id ? and(eq(wishList.id, id), eq(wishList.sales_project_id, req.user.project_id)) : eq(wishList.id, id));
 
     SuccessResponse(res, { message: "WishList updated successfully" }, 200);
 };
@@ -353,7 +356,7 @@ export const deleteWishLists = async (req: Request, res: Response) => {
         throw new NotFound("WishList not found");
     }
  
-    await db.delete(wishList).where(eq(wishList.id, id));
+    await db.delete(wishList).where(req.user?.project_id ? and(eq(wishList.id, id), eq(wishList.sales_project_id, req.user.project_id)) : eq(wishList.id, id));
 
     SuccessResponse(res, { message: "WishList deleted successfully" }, 200);
 };
@@ -444,7 +447,7 @@ export const convertWishListToVisit = async (req: Request, res: Response) => {
             products: visitProducts,
         });
 
-        await tx.delete(wishList).where(eq(wishList.id, id));
+        await tx.delete(wishList).where(req.user?.project_id ? and(eq(wishList.id, id), eq(wishList.sales_project_id, req.user.project_id)) : eq(wishList.id, id));
     });
 
     SuccessResponse(
