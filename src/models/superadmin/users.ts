@@ -17,9 +17,15 @@ import "dotenv/config";
 
 // If TASKITO_DB_NAME / PARENT_DB_NAME is provided in .env, users table will reference the Parent DB schema
 const parentDbName = process.env.TASKITO_DB_NAME || process.env.PARENT_DB_NAME;
-const tableCreator = parentDbName ? mysqlSchema(parentDbName).table : mysqlTable;
 
-export const users = tableCreator("users", {
+function createUsersTable<T extends Record<string, any>>(name: string, columns: T) {
+  if (parentDbName) {
+    return mysqlSchema(parentDbName).table(name, columns);
+  }
+  return mysqlTable(name, columns);
+}
+
+export const users = createUsersTable("users", {
   id: char("id", { length: 36 }).primaryKey().default(sql`(UUID())`), 
 
   name: varchar("name", { length: 200 }).notNull(),
