@@ -76,7 +76,7 @@ exports.convertWishListSchema = zod_1.z.object({
 const lists = async (req, res) => {
     const userId = req.user?.id;
     let sales = [];
-    if (req.user?.role === "leader" && userId) {
+    if ((req.user?.role === "leader" || req.user?.role === "leader_sales") && userId) {
         sales = await db_1.db
             .select({
             id: schema_1.users.id,

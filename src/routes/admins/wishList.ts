@@ -15,6 +15,7 @@ const router = Router();
 
 router.get("/", checkAdminLeaderSales(), catchAsync(getAllWishLists));
 router.get("/lists", checkAdminLeaderSales(), catchAsync(lists));
+router.get("/sales/lists", checkAdminLeaderSales(), catchAsync(lists));
 router.post("/:id/convert", checkAdminLeaderSales(), catchAsync(convertWishListToVisit));
 router.post("/convert/:id", checkAdminLeaderSales(), catchAsync(convertWishListToVisit));
 router.get("/:id", checkAdminLeaderSales(), catchAsync(getWishListsById));

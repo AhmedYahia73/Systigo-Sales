@@ -7,6 +7,7 @@ const checkpermission_1 = require("../../middlewares/checkpermission");
 const router = (0, express_1.Router)();
 router.get("/", (0, checkpermission_1.checkAdminLeaderSales)(), (0, catchAsync_1.catchAsync)(wishlist_1.getAllWishLists));
 router.get("/lists", (0, checkpermission_1.checkAdminLeaderSales)(), (0, catchAsync_1.catchAsync)(wishlist_1.lists));
+router.get("/sales/lists", (0, checkpermission_1.checkAdminLeaderSales)(), (0, catchAsync_1.catchAsync)(wishlist_1.lists));
 router.post("/:id/convert", (0, checkpermission_1.checkAdminLeaderSales)(), (0, catchAsync_1.catchAsync)(wishlist_1.convertWishListToVisit));
 router.post("/convert/:id", (0, checkpermission_1.checkAdminLeaderSales)(), (0, catchAsync_1.catchAsync)(wishlist_1.convertWishListToVisit));
 router.get("/:id", (0, checkpermission_1.checkAdminLeaderSales)(), (0, catchAsync_1.catchAsync)(wishlist_1.getWishListsById));

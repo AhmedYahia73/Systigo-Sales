@@ -86,7 +86,9 @@ export const createProduct = async (req: Request, res: Response) => {
   const validated = await createProductSchema.parseAsync({ body: req.body });
   const { name, feez, description, demo_link, points } = validated.body;
 
+  const newId = crypto.randomUUID();
   await db.insert(products).values({
+    id: newId,
     name,
     feez,
     description: description || null,
@@ -95,7 +97,7 @@ export const createProduct = async (req: Request, res: Response) => {
     sales_project_id: req.user?.project_id,
   });
 
-  SuccessResponse(res, { message: "Product created successfully" }, 201);
+  SuccessResponse(res, { id: newId, message: "Product created successfully" }, 201);
 };
 
 // ✅ Update Product

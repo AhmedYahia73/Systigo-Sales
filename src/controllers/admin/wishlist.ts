@@ -87,7 +87,7 @@ export const lists = async (req: Request, res: Response) => {
 
     let sales: { id: string; name: string }[] = [];
 
-    if (req.user?.role === "leader" && userId) {
+    if ((req.user?.role === "leader" || (req.user?.role as string) === "leader_sales") && userId) {
         sales = await db
             .select({
                 id: users.id,
