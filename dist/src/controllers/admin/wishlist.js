@@ -94,7 +94,7 @@ const lists = async (req, res) => {
             .from(schema_1.users)
             .where((0, drizzle_orm_1.eq)(schema_1.users.role, "sales"));
     }
-    const [visit_status, allProducts] = await Promise.all([
+    const [rawStatuses, allProducts] = await Promise.all([
         db_1.db
             .select({
             id: schema_1.visitStatus.id,
@@ -110,6 +110,7 @@ const lists = async (req, res) => {
         })
             .from(schema_1.products),
     ]);
+    const visit_status = [];
     (0, response_1.SuccessResponse)(res, { sales, visit_status, products: allProducts }, 200);
 };
 exports.lists = lists;

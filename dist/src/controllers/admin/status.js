@@ -52,7 +52,18 @@ const getAllVisitStatuss = async (req, res) => {
     if (req.user?.project_id) {
         query = query.where((0, drizzle_orm_1.eq)(schema_1.visitStatus.sales_project_id, req.user.project_id));
     }
-    const allVisitStatuss = await query;
+    const rawStatuses = await query;
+    const allVisitStatuss = [];
+    for (const st of rawStatuses) {
+        if (!st.id || st.id.trim() === "") {
+            const generatedId = crypto.randomUUID();
+            await db_1.db.update(schema_1.visitStatus).set({ id: generatedId }).where((0, drizzle_orm_1.eq)(schema_1.visitStatus.name, st.name)).catch(() => { });
+            allVisitStatuss.push({ ...st, id: generatedId });
+        }
+        else {
+            allVisitStatuss.push(st);
+        }
+    }
     (0, response_1.SuccessResponse)(res, { allVisitStatuss: allVisitStatuss }, 200);
 };
 exports.getAllVisitStatuss = getAllVisitStatuss;

@@ -170,7 +170,7 @@ const lists = async (req, res) => {
             .from(schema_1.users)
             .where((0, drizzle_orm_1.eq)(schema_1.users.role, "sales"));
     }
-    const [allProducts, visit_status] = await Promise.all([
+    const [allProducts, rawStatuses] = await Promise.all([
         db_1.db
             .select({
             id: schema_1.products.id,
@@ -186,6 +186,17 @@ const lists = async (req, res) => {
             .from(schema_1.visitStatus)
             .where((0, drizzle_orm_1.eq)(schema_1.visitStatus.status, true)),
     ]);
+    const visit_status = [];
+    for (const st of rawStatuses) {
+        if (!st.id || st.id.trim() === "") {
+            const generatedId = crypto.randomUUID();
+            await db_1.db.update(schema_1.visitStatus).set({ id: generatedId }).where((0, drizzle_orm_1.eq)(schema_1.visitStatus.name, st.name)).catch(() => { });
+            visit_status.push({ ...st, id: generatedId });
+        }
+        else {
+            visit_status.push(st);
+        }
+    }
     (0, response_1.SuccessResponse)(res, { sales: salesList, products: allProducts, visit_status }, 200);
 };
 exports.lists = lists;

@@ -110,7 +110,7 @@ export const lists = async (req: Request, res: Response) => {
             .where(eq(users.role, "sales"));
     }
 
-    const [visit_status, allProducts] = await Promise.all([
+    const [rawStatuses, allProducts] = await Promise.all([
         db
             .select({
                 id: visitStatus.id,
@@ -126,6 +126,9 @@ export const lists = async (req: Request, res: Response) => {
             })
             .from(products),
     ]);
+
+
+    const visit_status: any[] = [];
 
     SuccessResponse(res, { sales, visit_status, products: allProducts }, 200);
 };
@@ -225,7 +228,7 @@ export const getAllWishLists = async (req: Request, res: Response) => {
         query.limit(limit).offset(offset),
         countQuery
     ]);
- 
+
     // 6. إرسال النتيجة مع معلومات الـ Pagination الكاملة
     SuccessResponse(res, { 
         allWishLists,

@@ -200,7 +200,7 @@ export const lists = async (req: Request, res: Response) => {
       .where(eq(users.role, "sales"));
   }
 
-  const [allProducts, visit_status] = await Promise.all([
+  const [allProducts, rawStatuses] = await Promise.all([
     db
       .select({
         id: products.id,
@@ -216,6 +216,17 @@ export const lists = async (req: Request, res: Response) => {
       .from(visitStatus)
       .where(eq(visitStatus.status, true)),
   ]);
+
+  const visit_status = [];
+  for (const st of rawStatuses) {
+    if (!st.id || st.id.trim() === "") {
+      const generatedId = crypto.randomUUID();
+      await db.update(visitStatus).set({ id: generatedId }).where(eq(visitStatus.name, st.name)).catch(() => {});
+      visit_status.push({ ...st, id: generatedId });
+    } else {
+      visit_status.push(st);
+    }
+  }
 
   SuccessResponse(res, { sales: salesList, products: allProducts, visit_status }, 200);
 };
