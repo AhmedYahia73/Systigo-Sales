@@ -45,6 +45,25 @@ exports.ProductIdSchema = zod_1.z.object({
 // ==========================================
 // ✅ Get All Products
 const getAllProducts = async (req, res) => {
+    // Auto-heal any legacy products that might have an empty string '' as id
+    try {
+        const emptyIdRows = await db_1.db
+            .select({ name: schema_1.products.name })
+            .from(schema_1.products)
+            .where((0, drizzle_orm_1.eq)(schema_1.products.id, ""))
+            .limit(10);
+        for (let i = 0; i < emptyIdRows.length; i++) {
+            const fixedId = crypto.randomUUID();
+            await db_1.db
+                .update(schema_1.products)
+                .set({ id: fixedId })
+                .where((0, drizzle_orm_1.eq)(schema_1.products.id, ""))
+                .limit(1);
+        }
+    }
+    catch (err) {
+        // Ignore
+    }
     let query = db_1.db.select().from(schema_1.products).$dynamic();
     if (req.user?.project_id) {
         query = query.where((0, drizzle_orm_1.eq)(schema_1.products.sales_project_id, req.user.project_id));
@@ -128,8 +147,23 @@ const updateProduct = async (req, res) => {
 exports.updateProduct = updateProduct;
 // ✅ Delete Product
 const deleteProduct = async (req, res) => {
-    const validated = await exports.ProductIdSchema.parseAsync({ params: req.params });
-    const { id } = validated.params;
+    const id = (req.params.id || req.body?.id || req.query.id || "").trim();
+    if (!id) {
+        const emptyConditions = [(0, drizzle_orm_1.eq)(schema_1.products.id, "")];
+        if (req.user?.project_id) {
+            emptyConditions.push((0, drizzle_orm_1.eq)(schema_1.products.sales_project_id, req.user.project_id));
+        }
+        const emptyProduct = await db_1.db
+            .select()
+            .from(schema_1.products)
+            .where((0, drizzle_orm_1.and)(...emptyConditions))
+            .limit(1);
+        if (emptyProduct.length > 0) {
+            await db_1.db.delete(schema_1.products).where((0, drizzle_orm_1.and)(...emptyConditions));
+            return (0, response_1.SuccessResponse)(res, { message: "Product deleted successfully" }, 200);
+        }
+        throw new NotFound_1.NotFound("Product not found");
+    }
     const whereConditions = [(0, drizzle_orm_1.eq)(schema_1.products.id, id)];
     if (req.user?.project_id) {
         whereConditions.push((0, drizzle_orm_1.eq)(schema_1.products.sales_project_id, req.user.project_id));
