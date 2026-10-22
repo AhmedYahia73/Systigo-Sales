@@ -84,9 +84,6 @@ export const getProductById = async (req: Request, res: Response) => {
   const { id } = validated.params;
 
   const whereConditions = [eq(products.id, id)];
-  if (req.user?.project_id) {
-    whereConditions.push(eq(products.sales_project_id, req.user.project_id));
-  }
 
   const productRaw = await db
     .select()
@@ -130,9 +127,6 @@ export const updateProduct = async (req: Request, res: Response) => {
   const { name, feez, description, demo_link, points } = validated.body;
 
   const whereConditions = [eq(products.id, id)];
-  if (req.user?.project_id) {
-    whereConditions.push(eq(products.sales_project_id, req.user.project_id));
-  }
 
   const existingProduct = await db
     .select()
@@ -181,9 +175,6 @@ export const deleteProduct = async (req: Request, res: Response) => {
   }
 
   const whereConditions = [eq(products.id, id)];
-  if (req.user?.project_id) {
-    whereConditions.push(eq(products.sales_project_id, req.user.project_id));
-  }
 
   const existingProduct = await db
     .select()
